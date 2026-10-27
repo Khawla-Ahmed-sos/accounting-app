@@ -1,34 +1,77 @@
-// --- [1] كود البحث المتقدم للمنتجات والقيود وتجاوز التخزين المؤقت (Cache) ---
-(function() {
-    // تحديث تلقائي لرابط الملفات لجلب أحدث نسخة من السيرفر ومنع تعليق الكاش
-    const cacheBuster = "?v=" + new Date().getTime();
+/**
+ * نظام توزيع تكاليف الشحن آلياً بناءً على الوزن + إصدار القيود المحاسبية
+ * @param {Array} items - قائمة الأصناف في الفاتورة (اسم الصنف، السعر الأساسي، الوزن بالكيلو، الكمية)
+ * @param {Number} totalShippingCost - إجمالي تكلفة الشحن المستحقة على الشحنة
+ * @returns {Object} الفاتورة بعد التوزيع مع تفاصيل التكلفة والقيد المحاسبي الآلي
+ */
+function processShipmentAndAccounting(items, totalShippingCost) {
+    let totalWeight = 0;
     
-    // دالة البحث المتقدم وتصفية النتائج فورياً في المنظومة
-    window.AppSearchAndRefresh = function(searchInputId, tableId) {
-        const input = document.getElementById(searchInputId);
-        if (!input) return;
+    // 1. حساب إجمالي وزن الشحنة بالكامل
+    items.forEach(item => {
+        totalWeight += item.weight * item.quantity;
+    });
+
+    if (totalWeight <= 0) {
+        return { error: "خطأ: إجمالي الوزن يجب أن يكون أكبر من الصفر لتوزيع الشحن!" };
+    }
+
+    let updatedItems = [];
+    let totalPurchasesWithShipping = 0;
+
+    // 2. توزيع تكلفة الشحن آلياً على كل صنف حسب نسبته من الوزن الكلي (Landed Cost)
+    items.forEach(item => {
+        let itemTotalWeight = item.weight * item.quantity;
+        let weightRatio = itemTotalWeight / totalWeight; // نسبة وزنه من الإجمالي
         
-        const filter = input.value.toLowerCase().trim();
-        const table = document.getElementById(tableId);
-        if (!table) return;
+        // نصيبه من تكلفة الشحن
+        let allocatedShipping = totalShippingCost * weightRatio;
         
-        const rows = table.getElementsByTagName("tr");
+        // التكلفة الإجمالية للصنف الواحد بعد إضافة الشحن
+        let finalItemCost = item.unitPrice + (allocatedShipping / item.quantity);
         
-        for (let i = 1; i < rows.length; i++) {
-            let rowText = rows[i].textContent || rows[i].innerText;
-            if (rowText.toLowerCase().indexOf(filter) > -1) {
-                rows[i].style.display = "";
-            } else {
-                rows[i].style.display = "none";
+        totalPurchasesWithShipping += (finalItemCost * item.quantity);
+
+        updatedItems.push({
+            name: item.name,
+            quantity: item.quantity,
+            originalUnitPrice: item.unitPrice,
+            allocatedShippingPerUnit: allocatedShipping / item.quantity,
+            finalUnitPrice: finalItemCost.toFixed(2),
+            totalPrice: (finalItemCost * item.quantity).toFixed(2)
+        });
+    });
+
+    // 3. التوجيه الآلي للقيود المحاسبية (مزدوج: مدين ودائن)
+    let accountingJournalEntry = {
+        entryNumber: "JE-" + Math.floor(1000 + Math.random() * 9000),
+        description: "إثبات فاتورة مشتركات مع توزيع تكاليف الشحن آلياً بالوزن",
+        lines: [
+            {
+                accountName: "مخزون البضاعة (أصول متداولة)",
+                type: "مدين",
+                amount: totalPurchasesWithShipping.toFixed(2)
+            },
+            {
+                accountName: "الصندوق / البنك أو الموردين (التزامات/أصول)",
+                type: "دائن",
+                amount: totalPurchasesWithShipping.toFixed(2)
             }
-        }
+        ],
+        status: "متوازن (Debit = Credit)"
     };
 
-    // دالة مسح الكاش وإعادة تحميل الصفحة بأحدث بيانات
-    window.ForceSystemRefresh = function() {
-        window.location.reload(true);
+    return {
+        processedItems: updatedItems,
+        journalEntry: accountingJournalEntry
     };
-    
-    console.log("تم تحميل وتحديث أكواد المنظومة بنجاح دون مشاكل تخزين مؤقت.");
-})();
-    
+}
+
+// --- مثال تجريبي للاختبار ---
+let sampleInvoiceItems = [
+    { name: "صنف هوم دكور أ", unitPrice: 50, weight: 2, quantity: 10 }, // الوزن الكلي = 20 كجم
+    { name: "صنف هوم دكور ب", unitPrice: 100, weight: 3, quantity: 5 }   // الوزن الكلي = 15 كجم
+];
+// إجمالي الشحنة وزناً = 35 كجم. إذا كانت تكلفة الشحن الإجمالية 175 دينار:
+let shipmentResult = processShipmentAndAccounting(sampleInvoiceItems, 175);
+console.log(shipmentResult);
