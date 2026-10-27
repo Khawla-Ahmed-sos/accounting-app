@@ -1,300 +1,34 @@
-import os
+// --- [1] كود البحث المتقدم للمنتجات والقيود وتجاوز التخزين المؤقت (Cache) ---
+(function() {
+    // تحديث تلقائي لرابط الملفات لجلب أحدث نسخة من السيرفر ومنع تعليق الكاش
+    const cacheBuster = "?v=" + new Date().getTime();
+    
+    // دالة البحث المتقدم وتصفية النتائج فورياً في المنظومة
+    window.AppSearchAndRefresh = function(searchInputId, tableId) {
+        const input = document.getElementById(searchInputId);
+        if (!input) return;
+        
+        const filter = input.value.toLowerCase().trim();
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        
+        const rows = table.getElementsByTagName("tr");
+        
+        for (let i = 1; i < rows.length; i++) {
+            let rowText = rows[i].textContent || rows[i].innerText;
+            if (rowText.toLowerCase().indexOf(filter) > -1) {
+                rows[i].style.display = "";
+            } else {
+                rows[i].style.display = "none";
+            }
+        }
+    };
 
-# تخزين البيانات في الذاكرة (يمكن استبدالها بقاعدة بيانات لاحقاً)
-inventory = {}       # المخزن: {اسم_الصنف: {"qty": الكمية, "buy_price": سعر_الشراء, "sell_price": سعر_بيع}}
-purchases = []       # سجل المشتريات
-sales = []           # سجل المبيعات
-
-def clear_screen():
-    os.system('cls' if os.name == 'nt' else 'clear')
-
-def show_header(title):
-    print("=" * 60)
-    print(f"         {title}         ")
-    print("=" * 60)
-
-# 1. إدارة المخزن والاصناف
-def manage_inventory():
-    while True:
-        clear_screen()
-        show_header("إدارة المخزن والأصناف")
-        print("1. عرض الأصناف بالمخزن")
-        print("2. إضافة صنف جديد أو تحديث كمية/سعر")
-        print("3. الرجوع القائمة الرئيسية")
-        
-        choice = input("\nاختر رقماً: ").strip()
-        
-        if choice == '1':
-            clear_screen()
-            show_header("قائمة المخزن الحالية")
-            if not inventory:
-                print("المخزن فارغ تماماً.")
-            else:
-                print(f"{'اسم الصنف':<20} | {'الكمية':<10} | {'سعر الشراء':<12} | {'سعر البيع':<12}")
-                print("-" * 60)
-                for item, data in inventory.items():
-                    print(f"{item:<20} | {data['qty']:<10} | {data['buy_price']:<12} | {data['sell_price']:<12}")
-            input("\nاضغط Enter للمتابعة...")
-            
-        elif choice == '2':
-            clear_screen()
-            show_header("إضافة / تحديث صنف")
-            name = input("اسم الصنف: ").strip()
-            if not name:
-                print("اسم الصنف لا يمكن أن يكون فارغاً!")
-                input("\nاضغط Enter للمتابعة...")
-                continue
-            
-            try:
-                qty = int(input("الكمية المضافة: "))
-                buy_price = float(input("سعر الشراء للوحدة: "))
-                sell_price = float(input("سعر البيع للوحدة: "))
-            except ValueError:
-                print("خطأ: يجيب إدخال أرقام صحيحة للكمية والأسعار.")
-                input("\nاضغط Enter للمتابعة...")
-                continue
-            
-            if name in inventory:
-                inventory[name]['qty'] += qty
-                inventory[name]['buy_price'] = buy_price
-                inventory[name]['sell_price'] = sell_price
-                print(f"\nتم تحديث بيانات الصنف ({name}) بنجاح!")
-            else:
-                inventory[name] = {
-                    "qty": qty,
-                    "buy_price": buy_price,
-                    "sell_price": sell_price
-                }
-                print(f"\nتم إضافة الصنف الجديد ({name}) بنجاح!")
-            input("\nاضغط Enter للمتابعة...")
-            
-        elif choice == '3':
-            break
-
-# 2. فاتورة المشتريات (تتيح إضافة عدة أصناف)
-def create_purchase_invoice():
-    while True:
-        clear_screen()
-        show_header("إنشاء فاتورة مشتريات جديدة (عدة أصناف)")
-        
-        supplier = input("اسم المورد: ").strip()
-        invoice_items = []
-        
-        while True:
-            print("\n--- إضافة صنف للفاتورة ---")
-            item_name = input("اسم الصنف: ").strip()
-            if not item_name:
-                print("اسم الصنف مطلوب.")
-                continue
-            
-            try:
-                qty = int(input("الكمية المشتراة: "))
-                buy_price = float(input("سعر الشراء للوحدة: "))
-            except ValueError:
-                print("الرجاء إدخال أرقام صحيحة للكمية والسعر.")
-                continue
-            
-            invoice_items.append({
-                "item": item_name,
-                "qty": qty,
-                "buy_price": buy_price,
-                "total": qty * buy_price
-            })
-            
-            # تحديث المخزن تلقائياً
-            if item_name in inventory:
-                inventory[item_name]['qty'] += qty
-                inventory[item_name]['buy_price'] = buy_price
-            else:
-                # إذا لم يكن سعر البيع محدداً بعد، نجعله افتراضياً مساوياً لسعر الشراء مبدئياً
-                inventory[item_name] = {
-                    "qty": qty,
-                    "buy_price": buy_price,
-                    "sell_price": buy_price * 1.2  # هامش ربح افتراضي 20%
-                }
-            
-            cont = input("\nهل تريد إضافة صنف آخر لهذه الفاتورة؟ (y/n): ").strip().lower()
-            if cont != 'y':
-                break
-        
-        if invoice_items:
-            invoice_total = sum(i['total'] for i in invoice_items)
-            purchases.append({
-                "supplier": supplier,
-                "items": invoice_items,
-                "total_invoice": invoice_total
-            })
-            
-            clear_screen()
-            show_header("تفاصيل فاتورة المشتريات المعتمدة")
-            print(للمورد: فلان / المورد: {supplier})
-            print(f"{'الصنف':<20} | {'الكمية':<8} | {'السعر':<10} | {'الإجمالي':<10}")
-            print("-" * 52)
-            for i in invoice_items:
-                print(f"{i['item']:<20} | {i['qty']:<8} | {i['buy_price']:<10} | {i['total']:<10}")
-            print("-" * 52)
-            print(f"إجمالي الفاتورة الكلي: {invoice_total}")
-            print("\nتم حفظ فاتورة المشتريات وتحديث المخزن بنجاح!")
-        
-        choice = input("\nهل تريد إنشاء فاتورة مشتريات أخرى؟ (y/n): ").strip().lower()
-        if choice != 'y':
-            break
-
-# 3. فاتورة المبيعات (تتيح إضافة عدة أصناف مع فحص المخزن)
-def create_sales_invoice():
-    while True:
-        clear_screen()
-        show_header("إنشاء فاتورة مبيعات جديدة (عدة أصناف)")
-        
-        customer = input("اسم العميل: ").strip()
-        invoice_items = []
-        
-        while True:
-            print("\n--- إضافة صنف لفاتورة البيع ---")
-            item_name = input("اسم الصنف المطلوب: ").strip()
-            
-            if item_name not in inventory:
-                print(f"خطأ: الصنف '{item_name}' غير موجود بالمخزن أساساً!")
-                cont_err = input("هل تريد محاولة صنف آخر؟ (y/n): ").strip().lower()
-                if cont_err == 'y':
-                    continue
-                else:
-                    break
-            
-            available_qty = inventory[item_name]['qty']
-            print(f"الكمية المتاحة بالمخزن من ({item_name}) هي: {available_qty}")
-            
-            try:
-                qty = int(input("الكمية المراد بيعها: "))
-            except ValueError:
-                print("الرجاء إدخال رقم صحيح.")
-                continue
-            
-            if qty > available_qty:
-                print(f"عذراً! الكمية المطلوبة غير متوفرة (المتاح فقط: {available_qty}).")
-                continue
-            
-            # استخدام سعر البيع المخزن أو السماح بتعديله
-            default_sell_price = inventory[item_name]['sell_price']
-            price_input = input(f"سعر بيع الوحدة (اضغط Enter للاستفادة بالسعر الافتراضي {default_sell_price}): ").strip()
-            
-            sell_price = float(price_input) if price_input else default_sell_price
-            
-            # خصم الكمية من المخزن فورا
-            inventory[item_name]['qty'] -= qty
-            
-            invoice_items.append({
-                "item": item_name,
-                "qty": qty,
-                "sell_price": sell_price,
-                "total": qty * sell_price
-            })
-            
-            cont = input("\nهل تريد إضافة صنف آخر لهذه الفاتورة؟ (y/n): ").strip().lower()
-            if cont != 'y':
-                break
-        
-        if invoice_items:
-            invoice_total = sum(i['total'] for i in invoice_items)
-            sales.append({
-                "customer": customer,
-                "items": invoice_items,
-                "total_invoice": invoice_total
-            })
-            
-            clear_screen()
-            show_header("فاتورة المبيعات الصادرة")
-            print(f"اسم العميل: {customer}")
-            print(f"{'الصنف':<20} | {'الكمية':<8} | {'السعر':<10} | {'الإجمالي':<10}")
-            print("-" * 52)
-            for i in invoice_items:
-                print(f"{i['item']:<20} | {i['qty']:<8} | {i['sell_price']:<10} | {i['total']:<10}")
-            print("-" * 52)
-            print(f"إجمالي الفاتورة الكلي: {invoice_total}")
-            print("\nتم إصدار فاتورة المبيعات و خصم الكميات من المخزن بنجاح!")
-        
-        choice = input("\nهل تريد إنشاء فاتورة مبيعات أخرى؟ (y/n): ").strip().lower()
-        if choice != 'y':
-            break
-
-# 4. التقارير المالية والحركة
-def show_reports():
-    while True:
-        clear_screen()
-        show_header("التقارير المالية والحركة")
-        print("1. تقرير المشتريات السابقة")
-        print("2. تقرير المبيعات السابقة")
-        print("3. ملخص الحسابات والأرباح التقديرية")
-        print("4. الرجوع للقائمة الرئيسية")
-        
-        choice = input("\nاختر رقماً: ").strip()
-        
-        if choice == '1':
-            clear_screen()
-            show_header("سجل فواتير المشتريات")
-            if not purchases:
-                print("لا توجد فواتير مشتريات مسجلة بعد.")
-            else:
-                for idx, p in enumerate(purchases, 1):
-                    print(للمورد: f"\nفاتورة #{idx} | المورد: {p['supplier']} | الإجمالي الكلي: {p['total_invoice']}")
-                    for item in p['items']:
-                        print(f"   - {item['item']} (الكمية: {item['qty']}, سعر الوحدة: {item['buy_price']})")
-            input("\nاضغط Enter للمتابعة...")
-            
-        elif choice == '2':
-            clear_screen()
-            show_header("سجل فواتير المبيعات")
-            if not sales:
-                print("لا توجد فواتير مبيعات مسجلة بعد.")
-            else:
-                for idx, s in enumerate(sales, 1):
-                    print(f"\nفاتورة #{idx} | العميل: {s['customer']} | الإجمالي الكلي: {s['total_invoice']}")
-                    for item in s['items']:
-                        print(f"   - {item['item']} (الكمية: {item['qty']}, سعر البيع: {item['sell_price']})")
-            input("\nاضغط Enter للمتابعة...")
-            
-        elif choice == '3':
-            clear_screen()
-            show_header("الملخص المالي العام")
-            total_purchases_val = sum(p['total_invoice'] for p in purchases)
-            total_sales_val = sum(s['total_invoice'] for s in sales)
-            
-            print(f"إجمالي قيمة المشتريات الكلية: {total_purchases_val}")
-            print(f"إجمالي قيمة المبيعات الكلية: {total_sales_val}")
-            print(f"السيولة التقديرية (المبيعات - المشتريات): {total_sales_val - total_purchases_val}")
-            input("\nاضغط Enter للمتابعة...")
-            
-        elif choice == '4':
-            break
-
-# القائمة الرئيسية للمنظومة
-def main_menu():
-    while True:
-        clear_screen()
-        show_header("منظومة الحسابات والمخازن المتكاملة")
-        print("1. إدارة المخزن والأصناف")
-        print("2. إنشاء فاتورة مشتريات (متعددة الأصناف)")
-        print("3. إنشاء فاتورة مبيعات (متعددة الأصناف)")
-        print("4. التقارير والسجلات المالية")
-        print("5. إغلاق المنظومة والخروج")
-        
-        choice = input("\nاختر رقم العملية المطلوبة: ").strip()
-        
-        if choice == '1':
-            manage_inventory()
-        elif choice == '2':
-            create_purchase_invoice()
-        elif choice == '3':
-            create_sales_invoice()
-        elif choice == '4':
-            show_reports()
-        elif choice == '5':
-            clear_screen()
-            print("شكراً لاستخدامك منظومة الحسابات. إلى اللقاء!")
-            break
-        else:
-            print("خيار غير صحيح، الرجاء اختيار رقم من 1 إلى 5.")
-            input("\nاضغط Enter للمتابعة...")
-
-if __name__ == "__main__":
-    main_menu()
+    // دالة مسح الكاش وإعادة تحميل الصفحة بأحدث بيانات
+    window.ForceSystemRefresh = function() {
+        window.location.reload(true);
+    };
+    
+    console.log("تم تحميل وتحديث أكواد المنظومة بنجاح دون مشاكل تخزين مؤقت.");
+})();
+    
