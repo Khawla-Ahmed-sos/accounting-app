@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>منظومة محاسبة متكاملة</title>
-
+    <title>منظومة محاسبة ERP متكاملة</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -15,235 +14,53 @@
             --border: #e2e8f0;
             --success: #16a34a;
             --danger: #dc2626;
+            --warning: #d97706;
         }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-        }
-
-        body {
-            background-color: var(--bg);
-            color: var(--text);
-            direction: rtl;
-            padding: 15px;
-            display: flex;
-            justify-content: center;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 800px;
-        }
-
-        /* شاشة تسجيل الدخول */
-        #login-screen {
-            background: var(--card-bg);
-            padding: 30px 20px;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            text-align: center;
-            margin-top: 50px;
-        }
-
-        .login-icon {
-            font-size: 40px;
-            margin-bottom: 10px;
-        }
-
-        .form-group {
-            margin: 20px 0;
-        }
-
-        input, select {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 15px;
-            outline: none;
-            background: #fff;
-        }
-
-        input:focus, select:focus {
-            border-color: var(--primary);
-        }
-
-        .btn {
-            background: var(--primary);
-            color: #fff;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            width: 100%;
-            transition: 0.2s;
-        }
-
-        .btn:hover {
-            background: var(--primary-dark);
-        }
-
-        .btn-danger {
-            background: var(--danger);
-        }
-
-        /* المنظومة الرئيسية */
-        #app-screen {
-            display: none;
-        }
-
-        header {
-            background: #1e293b;
-            color: white;
-            padding: 15px;
-            border-radius: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .nav-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .tab-btn {
-            flex: 1;
-            padding: 12px;
-            background: #e2e8f0;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            color: var(--text);
-        }
-
-        .tab-btn.active {
-            background: var(--primary);
-            color: white;
-        }
-
-        .card {
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            margin-bottom: 15px;
-        }
-
-        .card-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        /* الدليل المحاسبي */
-        .account-group {
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            margin-bottom: 10px;
-            overflow: hidden;
-        }
-
-        .account-header {
-            background: #f1f5f9;
-            padding: 12px 15px;
-            font-weight: bold;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-        }
-
-        .account-code {
-            background: #e2e8f0;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 13px;
-        }
-
-        .sub-accounts {
-            padding: 10px 20px;
-            display: none;
-            background: #fff;
-        }
-
-        .sub-account-item {
-            padding: 8px 0;
-            border-bottom: 1px dashed var(--border);
-            display: flex;
-            justify-content: space-between;
-            font-size: 14px;
-        }
-
-        .sub-account-item:last-child {
-            border-bottom: none;
-        }
-
-        /* جدول دفتر اليومية */
-        .grid-form {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .full-width {
-            grid-column: span 2;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-            font-size: 14px;
-        }
-
-        th, td {
-            border: 1px solid var(--border);
-            padding: 10px;
-            text-align: center;
-        }
-
-        th {
-            background: #f1f5f9;
-        }
-
-        .badge-debit {
-            color: var(--success);
-            font-weight: bold;
-        }
-
-        .badge-credit {
-            color: var(--danger);
-            font-weight: bold;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); direction: rtl; padding: 15px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 900px; }
+        #login-screen { background: var(--card-bg); padding: 30px 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; margin-top: 50px; }
+        .login-icon { font-size: 40px; margin-bottom: 10px; }
+        .form-group { margin: 15px 0; text-align: right; }
+        input, select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; background: #fff; }
+        input:focus, select:focus { border-color: var(--primary); }
+        .btn { background: var(--primary); color: #fff; border: none; padding: 10px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; width: 100%; transition: 0.2s; }
+        .btn:hover { background: var(--primary-dark); }
+        .btn-success { background: var(--success); }
+        .btn-success:hover { background: #15803d; }
+        .btn-danger { background: var(--danger); }
+        #app-screen { display: none; }
+        header { background: #1e293b; color: white; padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .nav-tabs { display: flex; gap: 5px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
+        .tab-btn { flex: 1; padding: 10px; background: #e2e8f0; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: var(--text); white-space: nowrap; font-size: 13px; }
+        .tab-btn.active { background: var(--primary); color: white; }
+        .card { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        .card-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .full-width { grid-column: span 2; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        th, td { border: 1px solid var(--border); padding: 8px; text-align: center; }
+        th { background: #f1f5f9; }
+        .badge-debit { color: var(--success); font-weight: bold; }
+        .badge-credit { color: var(--danger); font-weight: bold; }
+        .account-group { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+        .account-header { background: #f1f5f9; padding: 10px 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 14px; }
+        .account-code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+        .sub-accounts { padding: 8px 15px; display: none; background: #fff; }
+        .sub-account-item { padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-
     <!-- شاشة تسجيل الدخول -->
     <div id="login-screen">
         <div class="login-icon">📊</div>
-        <h2>منظومة محاسبة</h2>
-        <p style="color: #64748b; font-size: 14px; margin-top: 5px;">أدخلي كلمة المرور للوصول إلى المنظومة</p>
-        
+        <h2>منظومة محاسبة ERP</h2>
+        <p style="color: #64748b; font-size: 13px; margin-top: 5px;">أدخلي كلمة المرور للوصول (1234)</p>
         <div class="form-group">
             <input type="password" id="password-input" placeholder="كلمة المرور">
         </div>
-        
         <button class="btn" onclick="checkPassword()">دخول المنظومة</button>
         <p id="error-msg" style="color: var(--danger); font-size: 13px; margin-top: 10px; display: none;">كلمة المرور غير صحيحة!</p>
     </div>
@@ -251,235 +68,278 @@
     <!-- المنظومة الرئيسية -->
     <div id="app-screen">
         <header>
-            <h3>📊 منظومة محاسبة</h3>
-            <button class="btn btn-danger" onclick="logout()" style="width: auto; padding: 6px 12px; font-size: 13px;">قفل المنظومة</button>
+            <h3>📊 منظومة محاسبة ERP</h3>
+            <button class="btn btn-danger" onclick="logout()" style="width: auto; padding: 5px 10px; font-size: 12px;">قفل المنظومة</button>
         </header>
 
         <!-- التبويبات -->
         <div class="nav-tabs">
-            <button class="tab-btn active" id="tab-chart-btn" onclick="switchTab('chart')">📂 الدليل المحاسبي</button>
-            <button class="tab-btn" id="tab-journal-btn" onclick="switchTab('journal')">📖 دفتر اليومية</button>
+            <button class="tab-btn active" id="btn-chart" onclick="switchTab('chart')">📂 الدليل</button>
+            <button class="tab-btn" id="btn-products" onclick="switchTab('products')">📦 المنتجات</button>
+            <button class="tab-btn" id="btn-purchases" onclick="switchTab('purchases')">📥 المشتريات</button>
+            <button class="tab-btn" id="btn-orders" onclick="switchTab('orders')">🛒 الطلبات</button>
+            <button class="tab-btn" id="btn-journal" onclick="switchTab('journal')">📖 اليومية</button>
         </div>
 
-        <!-- تبويب 1: الدليل المحاسبي -->
+        <!-- 1. الدليل المحاسبي -->
         <div id="tab-chart" class="card">
             <div class="card-title">📂 الدليل المحاسبي</div>
-            <p style="color: #64748b; font-size: 13px; margin-bottom: 15px;">اضغطي على أي حساب لتوسيع الحسابات الفرعية</p>
-
             <div class="account-group">
-                <div class="account-header" onclick="toggleSub('sub-1')">
-                    <span>1. الأصول ◀</span>
-                    <span class="account-code">#1000</span>
-                </div>
+                <div class="account-header" onclick="toggleSub('sub-1')"><span>1. الأصول ◀</span><span class="account-code">#1000</span></div>
                 <div class="sub-accounts" id="sub-1">
-                    <div class="sub-account-item"><span>1101 - النقدية بالخزينة</span></div>
-                    <div class="sub-account-item"><span>1102 - المصرف / البنك</span></div>
-                    <div class="sub-account-item"><span>1201 - المدينون / العملاء</span></div>
-                    <div class="sub-account-item"><span>1301 - المخزون</span></div>
+                    <div class="sub-account-item">1101 - النقدية بالخزينة</div>
+                    <div class="sub-account-item">1102 - المصرف / البنك</div>
+                    <div class="sub-account-item">1301 - المخزون</div>
                 </div>
             </div>
-
             <div class="account-group">
-                <div class="account-header" onclick="toggleSub('sub-2')">
-                    <span>2. الخصوم (الالتزامات) ◀</span>
-                    <span class="account-code">#2000</span>
-                </div>
+                <div class="account-header" onclick="toggleSub('sub-2')"><span>2. الخصوم ◀</span><span class="account-code">#2000</span></div>
                 <div class="sub-accounts" id="sub-2">
-                    <div class="sub-account-item"><span>2101 - الدائنون / الموردون</span></div>
-                    <div class="sub-account-item"><span>2201 - مصاريف مستحقة</span></div>
+                    <div class="sub-account-item">2101 - الموردون / الدائنون</div>
                 </div>
             </div>
-
             <div class="account-group">
-                <div class="account-header" onclick="toggleSub('sub-3')">
-                    <span>3. حقوق الملكية ◀</span>
-                    <span class="account-code">#3000</span>
-                </div>
-                <div class="sub-accounts" id="sub-3">
-                    <div class="sub-account-item"><span>3101 - رأس المال</span></div>
-                    <div class="sub-account-item"><span>3201 - الأرباح المبقاة</span></div>
-                </div>
-            </div>
-
-            <div class="account-group">
-                <div class="account-header" onclick="toggleSub('sub-4')">
-                    <span>4. الإيرادات ◀</span>
-                    <span class="account-code">#4000</span>
-                </div>
+                <div class="account-header" onclick="toggleSub('sub-4')"><span>4. الإيرادات ◀</span><span class="account-code">#4000</span></div>
                 <div class="sub-accounts" id="sub-4">
-                    <div class="sub-account-item"><span>4101 - إيراد المبيعات</span></div>
-                    <div class="sub-account-item"><span>4201 - إيرادات أخرى</span></div>
+                    <div class="sub-account-item">4101 - إيراد المبيعات</div>
                 </div>
             </div>
-
             <div class="account-group">
-                <div class="account-header" onclick="toggleSub('sub-5')">
-                    <span>5. المصروفات ◀</span>
-                    <span class="account-code">#5000</span>
-                </div>
+                <div class="account-header" onclick="toggleSub('sub-5')"><span>5. المصروفات ◀</span><span class="account-code">#5000</span></div>
                 <div class="sub-accounts" id="sub-5">
-                    <div class="sub-account-item"><span>5101 - مصروفات إدارية وعمومية</span></div>
-                    <div class="sub-account-item"><span>5201 - تكلفة المبيعات</span></div>
-                    <div class="sub-account-item"><span>5301 - مصروف الإيجار</span></div>
+                    <div class="sub-account-item">5201 - تكلفة البضاعة المباعة</div>
                 </div>
             </div>
         </div>
 
-        <!-- تبويب 2: دفتر اليومية -->
-        <div id="tab-journal" class="card" style="display: none;">
-            <div class="card-title">📖 تسجيل قيد يومية جديد</div>
-            
-            <form id="journal-form" onsubmit="addEntry(event)">
+        <!-- 2. المنتجات والمخزون -->
+        <div id="tab-products" class="card" style="display: none;">
+            <div class="card-title">📦 إضافة وإدارة المنتجات (مع تتبع المخزون واللون)</div>
+            <form onsubmit="addProduct(event)">
                 <div class="grid-form">
-                    <div>
-                        <label style="font-size: 13px; font-weight: bold;">التاريخ:</label>
-                        <input type="date" id="entry-date" required>
-                    </div>
-                    <div>
-                        <label style="font-size: 13px; font-weight: bold;">المبلغ (د.ل):</label>
-                        <input type="number" step="0.01" id="entry-amount" placeholder="0.00" required>
-                    </div>
-                    <div>
-                        <label style="font-size: 13px; font-weight: bold;">من حـ/ (المدين):</label>
-                        <select id="debit-account" required>
-                            <option value="">اختر الحساب المدين</option>
-                            <option value="1101 - النقدية بالخزينة">1101 - النقدية بالخزينة</option>
-                            <option value="1102 - المصرف / البنك">1102 - المصرف / البنك</option>
-                            <option value="1201 - المدينون / العملاء">1201 - المدينون / العملاء</option>
-                            <option value="1301 - المخزون">1301 - المخزون</option>
-                            <option value="5101 - مصروفات إدارية">5101 - مصروفات إدارية</option>
-                            <option value="5301 - مصروف الإيجار">5301 - مصروف الإيجار</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="font-size: 13px; font-weight: bold;">إلى حـ/ (الدائن):</label>
-                        <select id="credit-account" required>
-                            <option value="">اختر الحساب الدائن</option>
-                            <option value="4101 - إيراد المبيعات">4101 - إيراد المبيعات</option>
-                            <option value="1101 - النقدية بالخزينة">1101 - النقدية بالخزينة</option>
-                            <option value="1102 - المصرف / البنك">1102 - المصرف / البنك</option>
-                            <option value="2101 - الدائنون / الموردون">2101 - الدائنون / الموردون</option>
-                            <option value="3101 - رأس المال">3101 - رأس المال</option>
-                        </select>
-                    </div>
-                    <div class="full-width">
-                        <label style="font-size: 13px; font-weight: bold;">البيان / الشرح:</label>
-                        <input type="text" id="entry-desc" placeholder="شرح القيد (مثال: إيراد مبيعات اليوم)" required>
-                    </div>
+                    <div class="full-width"><label style="font-size: 12px; font-weight: bold;">اسم المنتج:</label><input type="text" id="prod-name" placeholder="مثال: دمية أميجورومي / قطعة ديكور" required></div>
+                    <div><label style="font-size: 12px; font-weight: bold;">اللون:</label><input type="text" id="prod-color" placeholder="مثال: أحمر / أبيض" required></div>
+                    <div><label style="font-size: 12px; font-weight: bold;">سعر البيع (د.ل):</label><input type="number" step="0.01" id="prod-price" placeholder="0.00" required></div>
+                    <div class="full-width"><label style="font-size: 12px; font-weight: bold;">الكمية الأولية بالمخزون:</label><input type="number" id="prod-qty" placeholder="0" required></div>
                 </div>
-                <button type="submit" class="btn">+ حفظ القيد</button>
+                <button type="submit" class="btn">+ حفظ المنتج بالمخزون</button>
             </form>
+            <hr style="margin: 15px 0; border: none; border-top: 1px solid var(--border);">
+            <div class="card-title">📋 قائمة المخزون الحالي</div>
+            <table>
+                <thead><tr><th>المنتج</th><th>اللون</th><th>السعر</th><th>الكمية</th></tr></thead>
+                <tbody id="products-table-body"><tr><td colspan="4" style="color: #94a3b8;">لا توجد منتجات مسجلة</td></tr></tbody>
+            </table>
+        </div>
 
-            <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border);">
+        <!-- 3. فواتير المشتريات -->
+        <div id="tab-purchases" class="card" style="display: none;">
+            <div class="card-title">📥 إدخال فاتورة مشتريات (تتولد قيداً آلياً)</div>
+            <form onsubmit="addPurchase(event)">
+                <div class="grid-form">
+                    <div><label style="font-size: 12px; font-weight: bold;">اختر المنتج:</label><select id="pur-product" required></select></div>
+                    <div><label style="font-size: 12px; font-weight: bold;">الكمية المشتراة:</label><input type="number" id="pur-qty" placeholder="العدد" required></div>
+                    <div><label style="font-size: 12px; font-weight: bold;">إجمالي تكلفة الشراء (د.ل):</label><input type="number" step="0.01" id="pur-amount" placeholder="0.00" required></div>
+                    <div><label style="font-size: 12px; font-weight: bold;">طريقة الدفع:</label><select id="pur-method"><option value="1101 - النقدية بالخزينة">نقداً بالخزينة</option><option value="2101 - الموردون / الدائنون">بالدين (على المورد)</option></select></div>
+                </div>
+                <button type="submit" class="btn btn-success">تسجيل الشراء وتوليد القيد وزيادة المخزون</button>
+            </form>
+            <hr style="margin: 15px 0; border: none; border-top: 1px solid var(--border);">
+            <div class="card-title">📋 سجل المشتريات</div>
+            <table>
+                <thead><tr><th>المنتج</th><th>الكمية</th><th>التكلفة</th><th>طريقة الدفع</th></tr></thead>
+                <tbody id="purchases-table-body"><tr><td colspan="4" style="color: #94a3b8;">لا توجد مشتريات</td></tr></tbody>
+            </table>
+        </div>
 
-            <div class="card-title">📋 سجل القيود اليومية</div>
+        <!-- 4. طلبات الزبائن والمبيعات -->
+        <div id="tab-orders" class="card" style="display: none;">
+            <div class="card-title">🛒 طلبات الزبائن (عند استلام القيمة ينقص المخزون ويتولد قيد المبيعات)</div>
+            <form onsubmit="addOrder(event)">
+                <div class="grid-form">
+                    <div><label style="font-size: 12px; font-weight: bold;">اسم الزبون:</label><input type="text" id="cust-name" placeholder="اسم العميل" required></div>
+                    <div><label style="font-size: 12px; font-weight: bold;">اختر المنتج:</label><select id="ord-product" required></select></div>
+                    <div><label style="font-size: 12px; font-weight: bold;">الكمية المطلوبة:</label><input type="number" id="ord-qty" placeholder="العدد" required></div>
+                    <div><label style="font-size: 12px; font-weight: bold;">سعر البيع الإجمالي (د.ل):</label><input type="number" step="0.01" id="ord-amount" placeholder="0.00" required></div>
+                </div>
+                <button type="submit" class="btn">+ تسجيل الطلب معلق</button>
+            </form>
+            <hr style="margin: 15px 0; border: none; border-top: 1px solid var(--border);">
+            <div class="card-title">📋 قائمة الطلبات الحالية</div>
+            <table>
+                <thead><tr><th>الزبون</th><th>المنتج واللون</th><th>الكمية</th><th>المبلغ</th><th>الحالة / الإجراء</th></tr></thead>
+                <tbody id="orders-table-body"><tr><td colspan="5" style="color: #94a3b8;">لا توجد طلبات</td></tr></tbody>
+            </table>
+        </div>
+
+        <!-- 5. دفتر اليومية -->
+        <div id="tab-journal" class="card" style="display: none;">
+            <div class="card-title">📖 دفتر اليومية (القيود الآلية واليدوية)</div>
             <div style="overflow-x: auto;">
                 <table>
-                    <thead>
-                        <tr>
-                            <th>التاريخ</th>
-                            <th>البيان</th>
-                            <th>حـ/ المدين</th>
-                            <th>حـ/ الدائن</th>
-                            <th>المبلغ</th>
-                        </tr>
-                    </thead>
-                    <tbody id="entries-table-body">
-                        <!-- القيود تظهر هنا -->
-                    </tbody>
+                    <thead><tr><th>التاريخ</th><th>البيان</th><th>حـ/ المدين</th><th>حـ/ الدائن</th><th>المبلغ</th></tr></thead>
+                    <tbody id="entries-table-body"><tr><td colspan="5" style="color: #94a3b8;">لا توجد قيود مسجلة بعد</td></tr></tbody>
                 </table>
             </div>
         </div>
-
     </div>
-
 </div>
 
 <script>
     const CORRECT_PASS = "1234";
-    let journalEntries = JSON.parse(localStorage.getItem('journalEntries')) || [];
-
-    // تعيين تاريخ اليوم كافتراضي
-    document.getElementById('entry-date').valueAsDate = new Date();
+    let products = JSON.parse(localStorage.getItem('erp_products')) || [];
+    let purchases = JSON.parse(localStorage.getItem('erp_purchases')) || [];
+    let orders = JSON.parse(localStorage.getItem('erp_orders')) || [];
+    let journalEntries = JSON.parse(localStorage.getItem('erp_journal')) || [];
 
     function checkPassword() {
-        const input = document.getElementById('password-input').value;
-        const errorMsg = document.getElementById('error-msg');
-        
-        if (input === CORRECT_PASS) {
+        if(document.getElementById('password-input').value === CORRECT_PASS) {
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('app-screen').style.display = 'block';
-            renderEntries();
+            refreshAll();
         } else {
-            errorMsg.style.display = 'block';
+            document.getElementById('error-msg').style.display = 'block';
         }
     }
+    function logout() { location.reload(); }
 
-    function logout() {
-        document.getElementById('app-screen').style.display = 'none';
-        document.getElementById('login-screen').style.display = 'block';
-        document.getElementById('password-input').value = '';
+    function switchTab(tab) {
+        ['chart', 'products', 'purchases', 'orders', 'journal'].forEach(t => {
+            document.getElementById('tab-' + t).style.display = (t === tab) ? 'block' : 'none';
+            document.getElementById('btn-' + t).classList.toggle('active', t === tab);
+        });
+        if(tab === 'purchases' || tab === 'orders') updateProductSelects();
     }
-
     function toggleSub(id) {
         const el = document.getElementById(id);
         el.style.display = (el.style.display === 'block') ? 'none' : 'block';
     }
 
-    function switchTab(tab) {
-        document.getElementById('tab-chart').style.display = (tab === 'chart') ? 'block' : 'none';
-        document.getElementById('tab-journal').style.display = (tab === 'journal') ? 'block' : 'none';
-        
-        document.getElementById('tab-chart-btn').classList.toggle('active', tab === 'chart');
-        document.getElementById('tab-journal-btn').classList.toggle('active', tab === 'journal');
-    }
-
-    function addEntry(e) {
+    // إدارة المنتجات
+    function addProduct(e) {
         e.preventDefault();
-        const date = document.getElementById('entry-date').value;
-        const amount = parseFloat(document.getElementById('entry-amount').value).toFixed(2);
-        const debit = document.getElementById('debit-account').value;
-        const credit = document.getElementById('credit-account').value;
-        const desc = document.getElementById('entry-desc').value;
+        const name = document.getElementById('prod-name').value;
+        const color = document.getElementById('prod-color').value;
+        const price = parseFloat(document.getElementById('prod-price').value);
+        const qty = parseInt(document.getElementById('prod-qty').value);
 
-        if (debit === credit) {
-            alert('لا يمكن أن يكون الحساب المدين والحساب الدائن هما نفس الحساب!');
-            return;
-        }
-
-        const newEntry = { date, amount, debit, credit, desc };
-        journalEntries.push(newEntry);
-        localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
-
-        document.getElementById('entry-desc').value = '';
-        document.getElementById('entry-amount').value = '';
-
-        renderEntries();
-        alert('تم حفظ القيد بنجاح!');
+        products.push({ id: Date.now(), name, color, price, qty });
+        localStorage.setItem('erp_products', JSON.stringify(products));
+        document.getElementById('prod-name').value = '';
+        document.getElementById('prod-color').value = '';
+        document.getElementById('prod-price').value = '';
+        document.getElementById('prod-qty').value = '';
+        refreshAll();
+        alert('تم حفظ المنتج وتحديث المخزون بنجاح!');
     }
 
-    function renderEntries() {
-        const tbody = document.getElementById('entries-table-body');
-        tbody.innerHTML = '';
-
-        if (journalEntries.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="color: #94a3b8;">لا توجد قيود مسجلة بعد</td></tr>';
-            return;
-        }
-
-        journalEntries.slice().reverse().forEach(entry => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${entry.date}</td>
-                <td>${entry.desc}</td>
-                <td class="badge-debit">${entry.debit}</td>
-                <td class="badge-credit">${entry.credit}</td>
-                <td style="font-weight: bold;">${entry.amount} د.ل</td>
-            `;
-            tbody.appendChild(tr);
+    function updateProductSelects() {
+        const pSel = document.getElementById('pur-product');
+        const oSel = document.getElementById('ord-product');
+        pSel.innerHTML = ''; oSel.innerHTML = '';
+        products.forEach((p, idx) => {
+            const opt = `<option value="${idx}">${p.name} (${p.color}) - مخزون: ${p.qty}</option>`;
+            pSel.innerHTML += opt;
+            oSel.innerHTML += opt;
         });
     }
-</script>
 
+    // فواتير المشتريات وتوليد القيد الآلي وزيادة المخزون
+    function addPurchase(e) {
+        e.preventDefault();
+        const pIdx = document.getElementById('pur-product').value;
+        const qty = parseInt(document.getElementById('pur-qty').value);
+        const amount = parseFloat(document.getElementById('pur-amount').value);
+        const method = document.getElementById('pur-method').value;
+
+        if(products.length === 0) { alert('أضف منتجات أولاً!'); return; }
+
+        products[pIdx].qty += qty; // زيادة المخزون
+        purchases.push({ product: `${products[pIdx].name} (${products[pIdx].color})`, qty, amount, method });
+
+        // توليد قيد آلي للمشتريات: من ح/ المخزون إلى ح/ الخزينة أو الموردون
+        journalEntries.push({
+            date: new Date().toISOString().split('T')[0],
+            desc: `شراء بضاعة / مخزون (${products[pIdx].name})`,
+            debit: '1301 - المخزون',
+            credit: method,
+            amount: amount.toFixed(2)
+        });
+
+        localStorage.setItem('erp_products', JSON.stringify(products));
+        localStorage.setItem('erp_purchases', JSON.stringify(purchases));
+        localStorage.setItem('erp_journal', JSON.stringify(journalEntries));
+
+        refreshAll();
+        alert('تم تسجيل المشتريات وتوليد القيد المحاسبي وزيادة المخزون تلقائياً!');
+    }
+
+    // إضافة طلب زبون
+    function addOrder(e) {
+        e.preventDefault();
+        const customer = document.getElementById('cust-name').value;
+        const pIdx = document.getElementById('ord-product').value;
+        const qty = parseInt(document.getElementById('ord-qty').value);
+        const amount = parseFloat(document.getElementById('ord-amount').value);
+
+        if(qty > products[pIdx].qty) {
+            alert('الكمية المطلوبة أكبر من المتوفر في المخزون!');
+            return;
+        }
+
+        orders.push({ id: Date.now(), customer, pIdx, qty, amount, status: 'معلق' });
+        localStorage.setItem('erp_orders', JSON.stringify(orders));
+        refreshAll();
+        alert('تم تسجيل الطلب بنجاح!');
+    }
+
+    // استلام قيمة الطلب (توليد قيد المبيعات وإنقاص المخزون)
+    function fulfillOrder(orderId) {
+        const order = orders.find(o => o.id === orderId);
+        if(!order || order.status === 'مستلم') return;
+
+        const prod = products[order.pIdx];
+        if(order.qty > prod.qty) { alert('المخزون غير كافٍ!'); return; }
+
+        prod.qty -= order.qty; // إنقاص المخزون تلقائياً
+        order.status = 'مستلم';
+
+        // توليد قيد آلي للمبيعات في دفتر اليومية
+        journalEntries.push({
+            date: new Date().toISOString().split('T')[0],
+            desc: `إيراد مبيعات للزبون: ${order.customer} (${prod.name})`,
+            debit: '1101 - النقدية بالخزينة',
+            credit: '4101 - إيراد المبيعات',
+            amount: order.amount.toFixed(2)
+        });
+
+        localStorage.setItem('erp_products', JSON.stringify(products));
+        localStorage.setItem('erp_orders', JSON.stringify(orders));
+        localStorage.setItem('erp_journal', JSON.stringify(journalEntries));
+
+        refreshAll();
+        alert('تم استلام القيمة، توليد قيد المبيعات، وإنقاص المخزون بنجاح!');
+    }
+
+    function refreshAll() {
+        // تحديث جدول المنتجات
+        const pBody = document.getElementById('products-table-body');
+        pBody.innerHTML = products.length ? products.map(p => `<tr><td>${p.name}</td><td>${p.color}</td><td>${p.price} د.ل</td><td><b>${p.qty}</b></td></tr>`).join('') : '<tr><td colspan="4">لا توجد منتجات مسجلة</td></tr>';
+
+        // تحديث جدول المشتريات
+        const purBody = document.getElementById('purchases-table-body');
+        purBody.innerHTML = purchases.length ? purchases.map(pu => `<tr><td>${pu.product}</td><td>${pu.qty}</td><td>${pu.amount} د.ل</td><td>${pu.method}</td></tr>`).join('') : '<tr><td colspan="4">لا توجد مشتريات</td></tr>';
+
+        // تحديث جدول الطلبات
+        const oBody = document.getElementById('orders-table-body');
+        oBody.innerHTML = orders.length ? orders.map(o => `<tr><td>${o.customer}</td><td>${products[o.pIdx].name} (${products[o.pIdx].color})</td><td>${o.qty}</td><td>${o.amount} د.ل</td><td>${o.status === 'معلق' ? `<button class="btn btn-success" style="padding:5px; font-size:11px;" onclick="fulfillOrder(${o.id})">استلام القيمة</button>` : '<span style="color:var(--success); font-weight:bold;">تم الاستلام والمبيعات ✅</span>'}</td></tr>`).join('') : '<tr><td colspan="5">لا توجد طلبات</td></tr>';
+
+        // تحديث دفتر اليومية
+        const jBody = document.getElementById('entries-table-body');
+        jBody.innerHTML = journalEntries.length ? journalEntries.slice().reverse().map(j => `<tr><td>${j.date}</td><td>${j.desc}</td><td class="badge-debit">${j.debit}</td><td class="badge-credit">${j.credit}</td><td><b>${j.amount} د.ل</b></td></tr>`).join('') : '<tr><td colspan="5">لا توجد قيود مسجلة بعد</td></tr>';
+        
+        updateProductSelects();
+    }
+</script>
 </body>
 </html>
