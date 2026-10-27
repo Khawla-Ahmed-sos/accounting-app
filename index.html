@@ -1,890 +1,617 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>منظومة ERP المحاسبية والمخزنية المتكاملة</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Tajawal Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Tajawal', sans-serif; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-    </style>
-</head>
-<body class="bg-gray-100 text-gray-800">
+import sqlite3
+from datetime import datetime
+import tkinter as tk
+from tkinter import messagebox, ttk
 
-    <!-- 1. واجهة كلمة السر والدخول -->
-    <div id="auth-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-            <div class="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl shadow-inner">
-                <i class="fa-solid fa-lock"></i>
-            </div>
-            <h2 class="text-2xl font-bold text-gray-800 mb-1">تسجيل الدخول للمنظومة</h2>
-            <p class="text-gray-500 text-sm mb-6">أدخل رمز المرور المكون من 4 أرقام للوصول (الافتراضي: 1234)</p>
-            
-            <form id="auth-form" onsubmit="handleLogin(event)" class="space-y-4">
-                <input type="password" id="pin-input" maxlength="4" placeholder="••••" required
-                    class="w-full text-center text-3xl tracking-widest py-3 border-2 border-gray-300 rounded-xl focus:border-indigo-600 focus:outline-none transition">
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg transition">
-                    دخول المنظومة <i class="fa-solid fa-arrow-left mr-2"></i>
-                </button>
-            </form>
-            <p id="auth-error" class="text-red-500 text-sm mt-3 hidden font-medium">رمز المرور غير صحيح!</p>
-        </div>
-    </div>
+# --- قاعدة البيانات ---
+conn = sqlite3.connect("erp_system.db")
+cursor = conn.cursor()
 
-    <!-- 2. الواجهة الرئيسية للمنظومة -->
-    <div id="app-screen" class="hidden min-h-screen flex flex-col">
+# إنشاء الجداول الأساسية
+cursor.executescript(
+    """
+CREATE TABLE IF NOT EXISTS users (
+    username TEXT,
+    password TEXT
+);
+INSERT INTO users SELECT 'admin', '1234' WHERE NOT EXISTS (SELECT * FROM users);
+
+CREATE TABLE IF NOT EXISTS accounts (
+    code TEXT PRIMARY KEY,
+    name TEXT,
+    type TEXT
+);
+
+CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE,
+    name TEXT,
+    weight REAL,
+    color TEXT,
+    price REAL,
+    cost REAL DEFAULT 0,
+    stock REAL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS journal (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT,
+    entry_no TEXT,
+    account_code TEXT,
+    description TEXT,
+    debit REAL,
+    credit REAL
+);
+
+CREATE TABLE IF NOT EXISTS purchase_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    po_no TEXT,
+    supplier TEXT,
+    status TEXT, -- 'Ordered', 'InTransit', 'Received'
+    total_goods REAL,
+    shipping_cost REAL DEFAULT 0,
+    customs_cost REAL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS purchase_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    po_id INTEGER,
+    product_code TEXT,
+    qty REAL,
+    price REAL,
+    weight REAL
+);
+"""
+)
+conn.commit()
+
+# إدخال الحسابات الافتراضية إذا كانت فارغة
+cursor.execute("SELECT COUNT(*) FROM accounts")
+if cursor.fetchone()[0] == 0:
+  default_accounts = [
+      ("111", "الصندوق (نقداً)", "أصول"),
+      ("112", "المصرف", "أصول"),
+      ("121", "المخزون", "أصول"),
+      ("122", "البضاعة في الطريق", "أصول"),
+      ("211", "الموردون", "التزامات"),
+      ("311", "رأس المال", "حقوق ملكية"),
+      ("411", "المبيعات", "إيرادات"),
+      ("511", "تكلفة البضاعة المباعة", "مصروفات"),
+      ("512", "مصروف نقل مشتريات (محلي)", "مصروفات"),
+  ]
+  cursor.executemany(
+      "INSERT INTO accounts (code, name, type) VALUES (?, ?, ?)",
+      default_accounts,
+  )
+  conn.commit()
+
+
+# --- الواجهة الرئيسية للبرنامج ---
+class ERPSystem:
+
+  def __init__(self, root):
+    self.root = root
+    self.root.title("منظومة ERP المتكاملة")
+    self.root.geometry("1100x700")
+    self.show_login_screen()
+
+  def clear_window(self):
+    for widget in self.root.winfo_children():
+      widget.destroy()
+
+  # 1. واجهة تسجيل الدخول
+  def show_login_screen(self):
+    self.clear_window()
+    frame = tk.Frame(self.root, bg="#f0f0f0")
+    frame.pack(expand=True, fill="both")
+
+    tk.Label(
+        frame,
+        text="تسجيل الدخول إلى منظومة ERP",
+        font=("Arial", 18, "bold"),
+        bg="#f0f0f0",
+    ).pack(pady=40)
+
+    tk.Label(
+        frame, text="كلمة المرور (1234):", font=("Arial", 12), bg="#f0f0f0"
+    ).pack(pady=5)
+    self.pass_entry = tk.Entry(frame, show="*", font=("Arial", 14), width=20)
+    self.pass_entry.pack(pady=5)
+
+    tk.Button(
+        frame,
+        text="دخول",
+        font=("Arial", 12, "bold"),
+        bg="#007bff",
+        fg="white",
+        width=15,
+        command=self.check_login,
+    ).pack(pady=20)
+
+  def check_login(self):
+    pwd = self.pass_entry.get()
+    cursor.execute("SELECT * FROM users WHERE password=?", (pwd,))
+    if cursor.fetchone() or pwd == "1234":
+      self.show_main_dashboard()
+    else:
+      messagebox.showerror("خطأ", "كلمة المرور غير صحيحة!")
+
+  # 2. اللوحة الرئيسية (النظام الداخلي)
+  def show_main_dashboard(self):
+    self.clear_window()
+
+    # شريط القوائم العلوي
+    menubar = tk.Menu(self.root)
+    self.root.config(menu=menubar)
+
+    menubar.add_command(label="المنتجات والأسعار", command=self.open_products)
+    menubar.add_command(label="المشتريات والشحن", command=self.open_purchases)
+    menubar.add_command(label="المخزون", command=self.open_inventory)
+    menubar.add_command(label="المبيعات", command=self.open_sales)
+    menubar.add_command(label="المحاسبة والتقارير", command=self.open_accounting)
+    menubar.add_command(label="خروج", command=self.show_login_screen)
+
+    # الواجهة الافتراضية عند الدخول
+    self.main_frame = tk.Frame(self.root)
+    self.main_frame.pack(expand=True, fill="both")
+    tk.Label(
+        self.main_frame,
+        text="مرحباً بك في منظومة ERP المحاسبية المتكاملة",
+        font=("Arial", 18, "bold"),
+    ).pack(expand=True)
+
+  # --- إدارة المنتجات ---
+  def open_products(self):
+    self.clear_window()
+    self.show_main_dashboard()
+
+    frame = tk.Frame(self.root)
+    frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+    tk.Label(
+        frame, text="إدارة المنتجات والأسعار", font=("Arial", 14, "bold")
+    ).pack(anchor="e", pady=5)
+
+    form_frame = tk.Frame(frame)
+    form_frame.pack(fill="x", pady=10)
+
+    tk.Label(form_frame, text="وصف المنتج:").grid(
+        row=0, column=5, padx=5, sticky="e"
+    )
+    e_name = tk.Entry(form_frame)
+    e_name.grid(row=0, column=4, padx=5)
+
+    tk.Label(form_frame, text="الوزن (كجم):").grid(
+        row=0, column=3, padx=5, sticky="e"
+    )
+    e_weight = tk.Entry(form_frame)
+    e_weight.grid(row=0, column=2, padx=5)
+
+    tk.Label(form_frame, text="اللون:").grid(
+        row=0, column=1, padx=5, sticky="e"
+    )
+    e_color = tk.Entry(form_frame)
+    e_color.grid(row=0, column=0, padx=5)
+
+    tk.Label(form_frame, text="السعر (إلزامي):").grid(
+        row=1, column=5, padx=5, sticky="e", pady=5
+    )
+    e_price = tk.Entry(form_frame)
+    e_price.grid(row=1, column=4, padx=5, pady=5)
+
+    def save_product():
+      if not e_price.get():
+        messagebox.showerror("خطأ", "سعر المنتج إلزامي!")
+        return
+      try:
+        price = float(e_price.get())
+        weight = float(e_weight.get() or 0)
+      except ValueError:
+        messagebox.showerror("خطأ", "يرجى إدخال أرقام صحيحة للسعر والوزن!")
+        return
+
+      # إنشاء كود المنتج تلقائياً
+      cursor.execute("SELECT COUNT(*) FROM products")
+      count = cursor.fetchone()[0] + 1
+      code = f"PRD-{count:04d}"
+
+      cursor.execute(
+          "INSERT INTO products (code, name, weight, color, price) VALUES"
+          " (?, ?, ?, ?, ?)",
+          (code, e_name.get(), weight, e_color.get(), price),
+      )
+      conn.commit()
+      messagebox.SUCCESS(
+          "نجاح", f"تم إضافة المنتج بنجاح، والكود المنشأ هو: {code}"
+      )
+      refresh_table()
+
+    tk.Button(
+        form_frame,
+        text="حفظ المنتج",
+        bg="green",
+        fg="white",
+        command=save_product,
+    ).grid(row=1, column=0, columnspan=2, pady=5)
+
+    # جدول عرض المنتجات
+    cols = ("الكود", "الوصف", "الوزن", "اللون", "السعر", "التكلفة", "المخزون")
+    tree = ttk.Treeview(frame, columns=cols, show="headings")
+    for col in cols:
+      tree.heading(col, text=col)
+    tree.pack(fill="both", expand=True, pady=10)
+
+    def refresh_table():
+      for row in tree.get_children():
+        tree.delete(row)
+      cursor.execute(
+          "SELECT code, name, weight, color, price, cost, stock FROM products"
+      )
+      for row in cursor.fetchall():
+        tree.insert("", "end", values=row)
+
+    refresh_table()
+
+  # --- المشتريات والشحن المتقدم ---
+  def open_purchases(self):
+    self.clear_window()
+    self.show_main_dashboard()
+
+    frame = tk.Frame(self.root)
+    frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+    tk.Label(
+        frame, text="إدارة المشتريات والشحن والجمرك", font=("Arial", 14, "bold")
+    ).pack(anchor="e", pady=5)
+
+    # نموذج طلب الشراء
+    f_frame = tk.Frame(frame)
+    f_frame.pack(fill="x", pady=5)
+
+    tk.Label(f_frame, text="رقم طلب الشراء:").grid(row=0, column=5)
+    e_po = tk.Entry(f_frame)
+    e_po.grid(row=0, column=4)
+
+    tk.Label(f_frame, text="المورد:").grid(row=0, column=3)
+    e_sup = tk.Entry(f_frame)
+    e_sup.grid(row=0, column=2)
+
+    tk.Label(f_frame, text="طريقة السداد:").grid(row=0, column=1)
+    pay_method = ttk.Combobox(
+        f_frame, values=["نقداً", "مصرف", "آجل"], state="readonly"
+    )
+    pay_method.grid(row=0, column=0)
+    pay_method.current(0)
+
+    # إضافة أصناف لطلب الشراء
+    items_frame = tk.LabelFrame(
+        frame, text="أصناف الشحنة في الطريق / المستلمة"
+    )
+    items_frame.pack(fill="x", pady=10)
+
+    tk.Label(items_frame, text="كود المنتج:").grid(row=0, column=0)
+    e_pcode = tk.Entry(items_frame)
+    e_pcode.grid(row=0, column=1)
+
+    tk.Label(items_frame, text="الكمية:").grid(row=0, column=2)
+    e_qty = tk.Entry(items_frame)
+    e_qty.grid(row=0, column=3)
+
+    tk.Label(items_frame, text="سعر الشراء الفردي:").grid(row=0, column=4)
+    e_pprice = tk.Entry(items_frame)
+    e_pprice.grid(row=0, column=5)
+
+    temp_items = []
+
+    def add_item_to_list():
+      code = e_pcode.get()
+      try:
+        qty = float(e_qty.get())
+        price = float(e_pprice.get())
+      except ValueError:
+        messagebox.showerror("خطأ", "الكمية والسعر يجب أن يكونا أرقاماً")
+        return
+
+      cursor.execute("SELECT weight FROM products WHERE code=?", (code,))
+      res = cursor.fetchone()
+      if not res:
+        messagebox.showerror("خطأ", "كود المنتج غير موجود!")
+        return
+      weight = res[0] * qty
+
+      temp_items.append((code, qty, price, weight))
+      messagebox.showinfo("تم", "تمت الإضافة للقائمة المؤقتة للشراء")
+
+    tk.Button(
+        items_frame, text="إضافة للصنف", command=add_item_to_list
+    ).grid(row=0, column=6, padx=10)
+
+    def submit_po():
+      if not temp_items:
+        messagebox.showerror("خطأ", "لم تتم إضافة أي أصناف!")
+        return
+
+      total_goods = sum([i[1] * i[2] for i in temp_items])
+      po_no = e_po.get()
+
+      # تسجيل قيد المشتريات الآلي (من ح/ البضاعة في الطريق أو المخزون إلى ح/ المورد أو الصندوق)
+      cursor.execute(
+          "INSERT INTO purchase_orders (po_no, supplier, status, total_goods)"
+          " VALUES (?, ?, 'InTransit', ?)",
+          (po_no, e_sup.get(), total_goods),
+      )
+      po_id = cursor.lastrowid
+
+      for item in temp_items:
+        cursor.execute(
+            "INSERT INTO purchase_items (po_id, product_code, qty, price,"
+            " weight) VALUES (?, ?, ?, ?, ?)",
+            (po_id, item[0], item[1], item[2], item[3]),
+        )
+
+      # القيد المحاسبي التلقائي
+      p_type = pay_method.get()
+      cr_acc = (
+          "211" if p_type == "آجل" else ("111" if p_type == "نقداً" else "112")
+      )
+      date_now = datetime.now().strftime("%Y-%m-%d")
+
+      cursor.execute(
+          "INSERT INTO journal (date, entry_no, account_code, description,"
+          " debit, credit) VALUES (?, ?, '122', ?, ?, 0)",
+          (date_now, po_no, f"اثبات بضاعة في الطريق لطلب {po_no}", total_goods),
+      )
+      cursor.execute(
+          "INSERT INTO journal (date, entry_no, account_code, description,"
+          " debit, credit) VALUES (?, ?, ?, ?, 0, ?)",
+          (date_now, po_no, cr_acc, f"سداد/التزام طلب شراء {po_no}", total_goods),
+      )
+      conn.commit()
+      messagebox.showinfo(
+          "نجاح",
+          "تم إصدار أمر الشراء وتسجيل البضاعة في الطريق وتوليد القيود أوتوماتيكياً!",
+      )
+
+    tk.Button(
+        frame,
+        text="اعتماد طلب الشراء",
+        bg="blue",
+        fg="white",
+        command=submit_po,
+    ).pack(pady=5)
+
+    # معالجة وصول الشحنة ومصاريف الشحن والجمرك الموزعة أوتوماتيكياً
+    dist_frame = tk.LabelFrame(
+        frame, text="استلام الشحنة وتوزيع مصاريف الشحن الدولي والجمارك أوتوماتيكياً"
+    )
+    dist_frame.pack(fill="x", pady=10)
+
+    tk.Label(dist_frame, text="رقم طلب الشراء المراد استلامه:").grid(
+        row=0, column=0
+    )
+    e_po_rcv = tk.Entry(dist_frame)
+    e_po_rcv.grid(row=0, column=1)
+
+    tk.Label(
+        dist_frame, text="إجمالي مصاريف الشحن الدولي (توزع أوتوماتيك بالوزن):"
+    ).grid(row=1, column=0)
+    e_ship = tk.Entry(dist_frame)
+    e_ship.grid(row=1, column=1)
+
+    tk.Label(dist_frame, text="إجمالي مصاريف الجمرك (توزع أوتوماتيك بالنسبة):") \
+        .grid(row=2, column=0)
+    e_customs = tk.Entry(dist_frame)
+    e_customs.grid(row=2, column=1)
+
+    def process_arrival():
+      po_no = e_po_rcv.get()
+      try:
+        ship_cost = float(e_ship.get() or 0)
+        customs_cost = float(e_customs.get() or 0)
+      except ValueError:
+        messagebox.showerror("خطأ", "المصاريف يجب أن تكون أرقاماً")
+        return
+
+      cursor.execute("SELECT id, total_goods FROM purchase_orders WHERE po_no=?", (po_no,))
+      po_res = cursor.fetchone()
+      if not po_res:
+        messagebox.showerror("خطأ", "رقم الطلب غير موجود!")
+        return
+      po_id, total_goods = po_res
+
+      # جلب أصناف الطلب وأوزانها
+      cursor.execute("SELECT product_code, qty, price, weight FROM purchase_items WHERE po_id=?", (po_id,))
+      items = cursor.fetchall()
+      total_weight = sum([i[3] for i in items])
+
+      date_now = datetime.now().strftime("%Y-%m-%d")
+
+      # توزيع الشحن الدولي والجمارك على تكلفة المنتجات وتحديث المخزون
+      for item in items:
+        p_code, qty, base_price, item_weight = item
+        # حصة الصنف من الشحن بناء على الوزن
+        item_ship = (item_weight / total_weight) * ship_cost if total_weight > 0 else 0
+        # حصة الصنف من الجمارك بناء على القيمة النسبية
+        item_customs = ( (qty * base_price) / total_goods ) * customs_cost if total_goods > 0 else 0
         
-        <!-- الشريط العلوي -->
-        <header class="bg-indigo-900 text-white shadow-md">
-            <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-                <div class="flex items-center space-x-3 space-x-reverse">
-                    <i class="fa-solid fa-boxes-packing text-2xl text-indigo-400"></i>
-                    <div>
-                        <h1 class="font-extrabold text-xl leading-tight">منظومة ERP المتكاملة</h1>
-                        <span class="text-xs text-indigo-300">النظام المالي والمخزني المتقدم</span>
-                    </div>
-                </div>
-                <button onclick="logout()" class="bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white px-3 py-1.5 rounded-lg text-sm transition">
-                    <i class="fa-solid fa-right-from-bracket ml-1"></i> خروج
-                </button>
-            </div>
-        </header>
-
-        <div class="max-w-7xl mx-auto px-4 py-6 w-full flex-grow flex flex-col md:flex-row gap-6">
-            
-            <!-- القائمة الجانبية للتنقل -->
-            <nav class="w-full md:w-64 bg-white rounded-xl shadow-sm p-3 flex flex-row md:flex-col gap-1 overflow-x-auto">
-                <button onclick="switchTab('catalog')" id="nav-catalog" class="nav-btn text-right px-4 py-3 rounded-lg font-bold text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition flex items-center gap-3 active">
-                    <i class="fa-solid fa-tags w-5"></i> دليل المنتجات والأسعار
-                </button>
-                <button onclick="switchTab('purchases')" id="nav-purchases" class="nav-btn text-right px-4 py-3 rounded-lg font-bold text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition flex items-center gap-3">
-                    <i class="fa-solid fa-truck-ramp-box w-5"></i> المشتريات والشحنات
-                </button>
-                <button onclick="switchTab('inventory')" id="nav-inventory" class="nav-btn text-right px-4 py-3 rounded-lg font-bold text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition flex items-center gap-3">
-                    <i class="fa-solid fa-warehouse w-5"></i> المخزون وتكاليف المنتجات
-                </button>
-                <button onclick="switchTab('sales')" id="nav-sales" class="nav-btn text-right px-4 py-3 rounded-lg font-bold text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition flex items-center gap-3">
-                    <i class="fa-solid fa-cart-shopping w-5"></i> المبيعات والنقدية
-                </button>
-                <button onclick="switchTab('accounting')" id="nav-accounting" class="nav-btn text-right px-4 py-3 rounded-lg font-bold text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition flex items-center gap-3">
-                    <i class="fa-solid fa-calculator w-5"></i> النظام المحاسبي والقوائم
-                </button>
-            </nav>
-
-            <!-- المحتوى الرئيسي -->
-            <main class="flex-grow bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                
-                <!-- تبويب: دليل المنتجات والأسعار -->
-                <div id="tab-catalog" class="tab-content active space-y-6">
-                    <div class="flex justify-between items-center border-b pb-4">
-                        <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-plus-circle text-indigo-600 ml-2"></i>إضافة منتج جديد للكتالوج</h2>
-                    </div>
-                    
-                    <form onsubmit="addProduct(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1">وصف/اسم المنتج *</label>
-                            <input type="text" id="p-name" required placeholder="مثال: طقم صحون فاخر" class="w-full p-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1">اللون</label>
-                            <input type="text" id="p-color" placeholder="أبيض / ذهبي" class="w-full p-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1">الوزن للقطعة (كجم) *</label>
-                            <input type="number" step="0.01" id="p-weight" required placeholder="0.5" class="w-full p-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1">سعر البيع الموصى به * (إجباري)</label>
-                            <input type="number" step="0.01" id="p-price" required placeholder="150" class="w-full p-2 border rounded-lg bg-yellow-50">
-                        </div>
-                        <div class="md:col-span-2 flex items-end">
-                            <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg hover:bg-indigo-700 transition">
-                                <i class="fa-solid fa-save ml-2"></i> حفظ المنتج وتوليد الكود آلياً
-                            </button>
-                        </div>
-                    </form>
-
-                    <h3 class="font-bold text-gray-700 text-lg">قائمة المنتجات والأسعار المسجلة</h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-right border">
-                            <thead class="bg-gray-100 text-gray-700 border-b">
-                                <tr>
-                                    <th class="p-3">كود المنتج (آلي)</th>
-                                    <th class="p-3">اسم المنتج / الوصف</th>
-                                    <th class="p-3">اللون</th>
-                                    <th class="p-3">الوزن (كجم)</th>
-                                    <th class="p-3">سعر البيع</th>
-                                </tr>
-                            </thead>
-                            <tbody id="products-table-body"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- تبويب: المشتريات والشحنات -->
-                <div id="tab-purchases" class="tab-content space-y-6">
-                    <h2 class="text-xl font-bold border-b pb-4"><i class="fa-solid fa-file-invoice-dollar text-indigo-600 ml-2"></i>إصدار طلب شراء جديد (بضاعة في الطريق)</h2>
-                    
-                    <form onsubmit="createPO(event)" class="space-y-4 bg-gray-50 p-4 rounded-xl border">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-600 mb-1">اختر المنتج</label>
-                                <select id="po-product" required class="w-full p-2 border rounded-lg"></select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-600 mb-1">الكمية المطلوبة</label>
-                                <input type="number" id="po-qty" min="1" value="10" required class="w-full p-2 border rounded-lg">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-600 mb-1">سعر الشراء الفردي الأصلي</label>
-                                <input type="number" step="0.01" id="po-cost" required placeholder="50" class="w-full p-2 border rounded-lg">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-600 mb-1">طريقة السداد</label>
-                                <select id="po-payment" class="w-full p-2 border rounded-lg">
-                                    <option value="cash">نقداً (حـ/ الصندوق)</option>
-                                    <option value="bank">مصرفي (حـ/ البنك)</option>
-                                    <option value="credit">بالآجل (حـ/ الموردين)</option>
-                                </select>
-                            </div>
-                            <div class="md:col-span-2 flex items-end">
-                                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition">
-                                    إصدار امر الشراء وتسجيل القيد المحاسبي آلياً (بضاعة في الطريق)
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-
-                    <h3 class="font-bold text-gray-700 text-lg">طلبات الشراء الشاغرة (في الطريق) وتكلفة الاستلام</h3>
-                    <div id="pending-orders-list" class="space-y-4"></div>
-                </div>
-
-                <!-- تبويب: المخزون -->
-                <div id="tab-inventory" class="tab-content space-y-6">
-                    <h2 class="text-xl font-bold border-b pb-4"><i class="fa-solid fa-boxes-stacked text-indigo-600 ml-2"></i>حالة المخزون وتكلفة المنتج المحملة (Landed Cost)</h2>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-right border">
-                            <thead class="bg-gray-100 border-b">
-                                <tr>
-                                    <th class="p-3">الكود</th>
-                                    <th class="p-3">المنتج</th>
-                                    <th class="p-3">الكمية بالمخزن</th>
-                                    <th class="p-3">وزن القطعة</th>
-                                    <th class="p-3">متوسط التكلفة المحملة (القطعة)</th>
-                                    <th class="p-3">سعر البيع</th>
-                                    <th class="p-3">إجمالي قيمة المخزون</th>
-                                </tr>
-                            </thead>
-                            <tbody id="inventory-table-body"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- تبويب: المبيعات -->
-                <div id="tab-sales" class="tab-content space-y-6">
-                    <h2 class="text-xl font-bold border-b pb-4"><i class="fa-solid fa-cash-register text-indigo-600 ml-2"></i>إصدار فاتورة بيع</h2>
-                    <form onsubmit="makeSale(event)" class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-xl border">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1">المنتج المراد بيعه</label>
-                            <select id="sale-product" required class="w-full p-2 border rounded-lg"></select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1">الكمية المباعة</label>
-                            <input type="number" id="sale-qty" min="1" value="1" required class="w-full p-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1">طريقة القبض</label>
-                            <select id="sale-payment" class="w-full p-2 border rounded-lg">
-                                <option value="cash">نقداً (الصندوق)</option>
-                                <option value="bank">مصرفي (البنك)</option>
-                                <option value="credit">آجل (العملاء)</option>
-                            </select>
-                        </div>
-                        <div class="flex items-end">
-                            <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2 rounded-lg hover:bg-emerald-700 transition">
-                                إتمام البيع وترحيل القيود
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- تبويب: المحاسبة والقوائم المالية -->
-                <div id="tab-accounting" class="tab-content space-y-6">
-                    <div class="flex gap-2 border-b pb-2 overflow-x-auto text-sm">
-                        <button onclick="switchAccSubTab('coa')" class="acc-sub-btn bg-gray-200 px-3 py-1.5 rounded-lg font-bold">دليل الحسابات</button>
-                        <button onclick="switchAccSubTab('journal')" class="acc-sub-btn bg-gray-200 px-3 py-1.5 rounded-lg font-bold">دفتر اليومية العامة</button>
-                        <button onclick="switchAccSubTab('ledger')" class="acc-sub-btn bg-gray-200 px-3 py-1.5 rounded-lg font-bold">دفتر الأستاذ العام</button>
-                        <button onclick="switchAccSubTab('tb')" class="acc-sub-btn bg-gray-200 px-3 py-1.5 rounded-lg font-bold">ميزان المراجعة</button>
-                        <button onclick="switchAccSubTab('fin')" class="acc-sub-btn bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold">القوائم المالية الختامية</button>
-                    </div>
-
-                    <!-- دليل الحسابات -->
-                    <div id="acc-coa" class="acc-sub-content space-y-4">
-                        <div class="flex justify-between items-center">
-                            <h3 class="font-bold text-lg">شجرة ودليل الحسابات</h3>
-                            <button onclick="showAddAccountModal()" class="bg-indigo-600 text-white px-3 py-1.5 text-xs rounded-lg font-bold">
-                                + إضافة حساب فرعي جديد
-                            </button>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm text-right border">
-                                <thead class="bg-gray-100">
-                                    <tr>
-                                        <th class="p-2 border">رقم الحساب</th>
-                                        <th class="p-2 border">اسم الحساب</th>
-                                        <th class="p-2 border">النوع</th>
-                                        <th class="p-2 border">الحساب الرئيسي / الأب</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="coa-table-body"></tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- دفتر اليومية العامة -->
-                    <div id="acc-journal" class="acc-sub-content space-y-4 hidden">
-                        <h3 class="font-bold text-lg">دفتر اليومية العامة (تسجيل أوتوماتيكي للقيود)</h3>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-xs text-right border">
-                                <thead class="bg-gray-100">
-                                    <tr>
-                                        <th class="p-2 border">رقم القيد</th>
-                                        <th class="p-2 border">التاريخ</th>
-                                        <th class="p-2 border">البيان / الشرح</th>
-                                        <th class="p-2 border">الحساب المدين</th>
-                                        <th class="p-2 border">الحساب الدائن</th>
-                                        <th class="p-2 border">المبلغ</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="journal-table-body"></tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- دفتر الأستاذ العام -->
-                    <div id="acc-ledger" class="acc-sub-content space-y-4 hidden">
-                        <div class="flex items-center gap-4">
-                            <h3 class="font-bold text-lg">دفتر الأستاذ العام:</h3>
-                            <select id="ledger-account-select" onchange="renderLedger()" class="p-2 border rounded-lg text-sm"></select>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-xs text-right border">
-                                <thead class="bg-gray-100">
-                                    <tr>
-                                        <th class="p-2 border">التاريخ</th>
-                                        <th class="p-2 border">البيان</th>
-                                        <th class="p-2 border">مدين</th>
-                                        <th class="p-2 border">دائن</th>
-                                        <th class="p-2 border">الرصيد المتحرك</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ledger-table-body"></tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- ميزان المراجعة -->
-                    <div id="acc-tb" class="acc-sub-content space-y-4 hidden">
-                        <h3 class="font-bold text-lg">ميزان المراجعة بالأرصدة</h3>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm text-right border">
-                                <thead class="bg-gray-100">
-                                    <tr>
-                                        <th class="p-2 border">رقم الحساب</th>
-                                        <th class="p-2 border">اسم الحساب</th>
-                                        <th class="p-2 border">الأرصدة المدينة</th>
-                                        <th class="p-2 border">الأرصدة الدائنة</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tb-table-body"></tbody>
-                                <tfoot id="tb-table-foot" class="font-bold bg-gray-50 border-t-2"></tfoot>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- القوائم المالية -->
-                    <div id="acc-fin" class="acc-sub-content space-y-6 hidden">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <!-- قائمة الدخل -->
-                            <div class="border rounded-xl p-4 bg-slate-50 shadow-sm">
-                                <h4 class="font-bold text-indigo-900 text-lg border-b pb-2 mb-3">قائمة الدخل (الأرباح والخسائر)</h4>
-                                <div class="space-y-2 text-sm">
-                                    <div class="flex justify-between"><span>إيراد المبيعات:</span><span id="stat-sales" class="font-bold">0.00</span></div>
-                                    <div class="flex justify-between text-red-600"><span>تكلفة المبيعات (COGS):</span><span id="stat-cogs" class="font-bold">(0.00)</span></div>
-                                    <hr>
-                                    <div class="flex justify-between font-bold text-base"><span>مجمل الربح:</span><span id="stat-gross-profit">0.00</span></div>
-                                    <div class="flex justify-between text-red-600"><span>مصروفات نقل مشتريات (محلي):</span><span id="stat-freight-exp" class="font-bold">(0.00)</span></div>
-                                    <hr class="border-indigo-200">
-                                    <div class="flex justify-between font-extrabold text-lg text-emerald-700"><span>صافي الربح / الخسارة:</span><span id="stat-net-profit">0.00</span></div>
-                                </div>
-                            </div>
-
-                            <!-- الميزانية العمومية -->
-                            <div class="border rounded-xl p-4 bg-slate-50 shadow-sm">
-                                <h4 class="font-bold text-indigo-900 text-lg border-b pb-2 mb-3">الميزانية العمومية (المركز المالي)</h4>
-                                <div class="grid grid-cols-2 gap-4 text-xs">
-                                    <div>
-                                        <h5 class="font-bold border-b pb-1 text-gray-700">الأصول</h5>
-                                        <div class="space-y-1 mt-2">
-                                            <div class="flex justify-between"><span>الصندوق:</span><span id="bs-cash">0.00</span></div>
-                                            <div class="flex justify-between"><span>البنك:</span><span id="bs-bank">0.00</span></div>
-                                            <div class="flex justify-between"><span>العملاء:</span><span id="bs-ar">0.00</span></div>
-                                            <div class="flex justify-between"><span>المخزون:</span><span id="bs-inv">0.00</span></div>
-                                            <div class="flex justify-between text-blue-600"><span>بضاعة في الطريق:</span><span id="bs-transit">0.00</span></div>
-                                            <hr>
-                                            <div class="flex justify-between font-bold text-sm"><span>إجمالي الأصول:</span><span id="bs-total-assets">0.00</span></div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <h5 class="font-bold border-b pb-1 text-gray-700">الالتزامات وحقوق الملكية</h5>
-                                        <div class="space-y-1 mt-2">
-                                            <div class="flex justify-between"><span>الموردون:</span><span id="bs-ap">0.00</span></div>
-                                            <div class="flex justify-between"><span>رأس المال:</span><span id="bs-capital">0.00</span></div>
-                                            <div class="flex justify-between"><span>أرباح العام:</span><span id="bs-retained">0.00</span></div>
-                                            <hr>
-                                            <div class="flex justify-between font-bold text-sm"><span>إجمالي الالتزامات والملكية:</span><span id="bs-total-liab-eq">0.00</span></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
-            </main>
-        </div>
-    </div>
-
-    <!-- Modal إضافة حساب جديد -->
-    <div id="add-account-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
-            <h3 class="font-bold text-lg border-b pb-2">إضافة حساب فرعي جديد</h3>
-            <form onsubmit="saveNewAccount(event)" class="space-y-3">
-                <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">رقم الحساب الفرعي</label>
-                    <input type="text" id="acc-code" required class="w-full p-2 border rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">اسم الحساب</label>
-                    <input type="text" id="acc-name" required class="w-full p-2 border rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">نوع الحساب</label>
-                    <select id="acc-type" class="w-full p-2 border rounded-lg">
-                        <option value="asset">أصول</option>
-                        <option value="liability">التزامات</option>
-                        <option value="equity">حقوق ملكية</option>
-                        <option value="revenue">إيرادات</option>
-                        <option value="expense">مصروفات</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">الحساب الأب / الرئيسي</label>
-                    <select id="acc-parent" class="w-full p-2 border rounded-lg"></select>
-                </div>
-                <div class="flex gap-2 pt-2">
-                    <button type="submit" class="flex-1 bg-indigo-600 text-white font-bold py-2 rounded-lg">حفظ الحساب</button>
-                    <button type="button" onclick="closeAddAccountModal()" class="bg-gray-300 px-4 py-2 rounded-lg font-bold">إلغاء</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <script>
-        // === 1. حالة النظام وقاعدة البيانات المحلية ===
-        const PIN_CODE = "1234";
-
-        let state = {
-            products: [], // { id, code, name, color, weight, price, qty, avgCost }
-            purchaseOrders: [], // { id, productId, qty, unitCost, paymentMethod, status: 'pending'|'received' }
-            journal: [], // { id, date, desc, drAccount, crAccount, amount }
-            accounts: [
-                { code: '1000', name: 'الأصول', type: 'asset', parent: null },
-                { code: '1100', name: 'الصندوق', type: 'asset', parent: '1000' },
-                { code: '1200', name: 'المصرف / البنك', type: 'asset', parent: '1000' },
-                { code: '1300', name: 'العملاء (مدينون)', type: 'asset', parent: '1000' },
-                { code: '1400', name: 'المخزون', type: 'asset', parent: '1000' },
-                { code: '1500', name: 'البضاعة في الطريق', type: 'asset', parent: '1000' },
-                { code: '2000', name: 'الالتزامات', type: 'liability', parent: null },
-                { code: '2100', name: 'الموردون (دائنون)', type: 'liability', parent: '2000' },
-                { code: '3000', name: 'حقوق الملكية', type: 'equity', parent: null },
-                { code: '3100', name: 'رأس المال', type: 'equity', parent: '3000' },
-                { code: '4000', name: 'الإيرادات', type: 'revenue', parent: null },
-                { code: '4100', name: 'إيراد المبيعات', type: 'revenue', parent: '4000' },
-                { code: '5000', name: 'المصروفات والتكاليف', type: 'expense', parent: null },
-                { code: '5100', name: 'تكلفة البضاعة المباعة (COGS)', type: 'expense', parent: '5000' },
-                { code: '5200', name: 'مصروف نقل مشتريات', type: 'expense', parent: '5000' }
-            ]
-        };
-
-        // === 2. التحكم في واجهة الدخول والأمان ===
-        function handleLogin(e) {
-            e.preventDefault();
-            const pin = document.getElementById('pin-input').value;
-            if (pin === PIN_CODE) {
-                document.getElementById('auth-screen').classList.add('hidden');
-                document.getElementById('app-screen').classList.remove('hidden');
-                initApp();
-            } else {
-                document.getElementById('auth-error').classList.remove('hidden');
-            }
-        }
-
-        function logout() {
-            document.getElementById('auth-screen').classList.remove('hidden');
-            document.getElementById('app-screen').classList.add('hidden');
-            document.getElementById('pin-input').value = '';
-        }
-
-        // === 3. التنقل بين التبويبات ===
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active', 'bg-indigo-50', 'text-indigo-600'));
-            
-            document.getElementById(`tab-${tabId}`).classList.add('active');
-            document.getElementById(`nav-${tabId}`).classList.add('bg-indigo-50', 'text-indigo-600');
-        }
-
-        function switchAccSubTab(subId) {
-            document.querySelectorAll('.acc-sub-content').forEach(el => el.classList.add('hidden'));
-            document.getElementById(`acc-${subId}`).classList.remove('hidden');
-            if(subId === 'ledger') renderLedger();
-            if(subId === 'tb') renderTrialBalance();
-            if(subId === 'fin') renderFinancialStatements();
-        }
-
-        // === 4. إدارة كتالوج المنتجات ===
-        let productCounter = 1001;
-
-        function addProduct(e) {
-            e.preventDefault();
-            const name = document.getElementById('p-name').value;
-            const color = document.getElementById('p-color').value || '-';
-            const weight = parseFloat(document.getElementById('p-weight').value);
-            const price = parseFloat(document.getElementById('p-price').value);
-
-            const newProduct = {
-                id: Date.now().toString(),
-                code: `PRD-${productCounter++}`,
-                name,
-                color,
-                weight,
-                price,
-                qty: 0,
-                avgCost: 0
-            };
-
-            state.products.push(newProduct);
-            renderProducts();
-            updateSelectOptions();
-            e.target.reset();
-        }
-
-        function renderProducts() {
-            const tbody = document.getElementById('products-table-body');
-            tbody.innerHTML = state.products.map(p => `
-                <tr class="border-b">
-                    <td class="p-3 font-bold text-indigo-600">${p.code}</td>
-                    <td class="p-3 font-medium">${p.name}</td>
-                    <td class="p-3 text-gray-500">${p.color}</td>
-                    <td class="p-3">${p.weight} كجم</td>
-                    <td class="p-3 font-bold">${p.price.toFixed(2)}</td>
-                </tr>
-            `).join('');
-        }
-
-        // === 5. دورة المشتريات والشحنات وتوزيع التكاليف ===
-        function createPO(e) {
-            e.preventDefault();
-            const productId = document.getElementById('po-product').value;
-            const qty = parseInt(document.getElementById('po-qty').value);
-            const unitCost = parseFloat(document.getElementById('po-cost').value);
-            const paymentMethod = document.getElementById('po-payment').value;
-
-            const totalPurchaseAmount = qty * unitCost;
-
-            const newPO = {
-                id: 'PO-' + Date.now().toString().slice(-5),
-                productId,
-                qty,
-                unitCost,
-                totalAmount: totalPurchaseAmount,
-                paymentMethod,
-                status: 'pending'
-            };
-
-            state.purchaseOrders.push(newPO);
-
-            // إصدار قيد محاسبي آلي: من حـ/ البضاعة في الطريق إلى (الصندوق/البنك/الموردين)
-            let crAcc = '1100'; // صندوق
-            if (paymentMethod === 'bank') crAcc = '1200';
-            if (paymentMethod === 'credit') crAcc = '2100';
-
-            addJournalEntry(`شراء بضاعة في الطريق - طلب رقم ${newPO.id}`, '1500', crAcc, totalPurchaseAmount);
-
-            renderPendingOrders();
-            renderJournal();
-            alert(`تم إصدار طلب الشراء ${newPO.id} وقيد المبلغ بـ "حـ/ البضاعة في الطريق" بنجاح.`);
-        }
-
-        function renderPendingOrders() {
-            const container = document.getElementById('pending-orders-list');
-            const pending = state.purchaseOrders.filter(po => po.status === 'pending');
-
-            if (pending.length === 0) {
-                container.innerHTML = `<div class="p-4 bg-gray-100 rounded-lg text-gray-500 text-center text-sm">لا توجد طلبات شراء في الطريق حالياً</div>`;
-                return;
-            }
-
-            container.innerHTML = pending.map(po => {
-                const prod = state.products.find(p => p.id === po.productId);
-                return `
-                    <div class="p-4 bg-blue-50/50 border border-blue-200 rounded-xl space-y-3">
-                        <div class="flex justify-between items-center font-bold">
-                            <span class="text-indigo-900">${po.id} - ${prod.name} (${po.qty} قطعة)</span>
-                            <span class="text-sm bg-amber-100 text-amber-800 px-2 py-0.5 rounded">في الطريق</span>
-                        </div>
-                        <div class="text-xs text-gray-600 grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <div>تكلفة الشراء الأصلي: <b>${po.totalAmount.toFixed(2)}</b></div>
-                            <div>إجمالي الوزن: <b>${(prod.weight * po.qty).toFixed(2)} كجم</b></div>
-                            <div>طريقة السداد: <b>${po.paymentMethod}</b></div>
-                        </div>
-
-                        <!-- نموذج معالجة الوصول واستلام الشحنة -->
-                        <div class="bg-white p-3 rounded-lg border text-xs space-y-2">
-                            <div class="font-bold text-gray-700">تكاليف الوصول والشحن عند الاستلام:</div>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                <div>
-                                    <label class="block mb-1">نوع الشحن</label>
-                                    <select id="ship-type-${po.id}" class="w-full p-1 border rounded">
-                                        <option value="intl">شحن دولي (يحمل على تكلفة البضاعة)</option>
-                                        <option value="local">شحن محلي (مصروف نقل مشتريات)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block mb-1">قيمة الشحن (د.ل)</label>
-                                    <input type="number" id="ship-cost-${po.id}" value="0" step="0.01" class="w-full p-1 border rounded">
-                                </div>
-                                <div>
-                                    <label class="block mb-1">قيمة الجمرك (توزع بنسبة القيمة)</label>
-                                    <input type="number" id="customs-cost-${po.id}" value="0" step="0.01" class="w-full p-1 border rounded">
-                                </div>
-                            </div>
-                            <button onclick="processArrival('${po.id}')" class="w-full bg-emerald-600 text-white font-bold py-1.5 rounded hover:bg-emerald-700 transition mt-2">
-                                تأكيد وصول الشحنة وإدخالها للمخزن وتوزيع التكاليف
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // معالجة وصول الشحنة وتوليد التكاليف المحملة والقيود
-        function processArrival(poId) {
-            const po = state.purchaseOrders.find(p => p.id === poId);
-            const prod = state.products.find(p => p.id === po.productId);
-
-            const shipType = document.getElementById(`ship-type-${poId}`).value;
-            const shipCost = parseFloat(document.getElementById(`ship-cost-${poId}`).value) || 0;
-            const customsCost = parseFloat(document.getElementById(`customs-cost-${poId}`).value) || 0;
-
-            let landedCostTotal = po.totalAmount + customsCost;
-
-            if (shipType === 'intl') {
-                // الشحن الدولي يحمل على البضاعة
-                landedCostTotal += shipCost;
-                if (shipCost > 0) {
-                    addJournalEntry(`مصروف شحن دولي للطلب ${po.id}`, '1500', '1100', shipCost);
-                }
-            } else {
-                // الشحن المحلي يحمل على حساب مصروف نقل مشتريات
-                if (shipCost > 0) {
-                    addJournalEntry(`مصروف نقل مشتريات محلي للطلب ${po.id}`, '5200', '1100', shipCost);
-                }
-            }
-
-            if (customsCost > 0) {
-                addJournalEntry(`رسوم جمركية للطلب ${po.id}`, '1500', '1100', customsCost);
-            }
-
-            // إقفال البضاعة في الطريق وتحويلها للمخزون بالقيمة المحملة
-            addJournalEntry(`إدخال البضاعة للمخزن بتكلفة محملة للطلب ${po.id}`, '1400', '1500', landedCostTotal);
-
-            // تحديث المخزون ومتوسط التكلفة للقطعة
-            const currentTotalValue = prod.qty * prod.avgCost;
-            const newTotalQty = prod.qty + po.qty;
-            const newTotalValue = currentTotalValue + landedCostTotal;
-            
-            prod.qty = newTotalQty;
-            prod.avgCost = newTotalValue / newTotalQty;
-
-            po.status = 'received';
-
-            renderPendingOrders();
-            renderInventory();
-            renderJournal();
-            alert(`تم إدخال البضاعة للمخزن بنجاح! التكلفة الإجمالية المحملة للقطعة: ${prod.avgCost.toFixed(2)}`);
-        }
-
-        // === 6. المخزون والمبيعات ===
-        function renderInventory() {
-            const tbody = document.getElementById('inventory-table-body');
-            tbody.innerHTML = state.products.map(p => `
-                <tr class="border-b">
-                    <td class="p-3 font-bold">${p.code}</td>
-                    <td class="p-3">${p.name}</td>
-                    <td class="p-3 font-bold text-blue-600">${p.qty}</td>
-                    <td class="p-3">${p.weight} كجم</td>
-                    <td class="p-3 font-bold text-emerald-700">${p.avgCost.toFixed(2)}</td>
-                    <td class="p-3 font-bold">${p.price.toFixed(2)}</td>
-                    <td class="p-3 font-bold">${(p.qty * p.avgCost).toFixed(2)}</td>
-                </tr>
-            `).join('');
-        }
-
-        function makeSale(e) {
-            e.preventDefault();
-            const productId = document.getElementById('sale-product').value;
-            const qty = parseInt(document.getElementById('sale-qty').value);
-            const paymentMethod = document.getElementById('sale-payment').value;
-
-            const prod = state.products.find(p => p.id === productId);
-
-            if (prod.qty < qty) {
-                alert('الكمية المتاحة في المخزون غير كافية!');
-                return;
-            }
-
-            const totalRevenue = qty * prod.price;
-            const totalCOGS = qty * prod.avgCost;
-
-            // 1. قيد الإيراد
-            let drAcc = '1100'; // صندوق
-            if (paymentMethod === 'bank') drAcc = '1200';
-            if (paymentMethod === 'credit') drAcc = '1300';
-
-            addJournalEntry(`فاتورة بيع منتج ${prod.name}`, drAcc, '4100', totalRevenue);
-
-            // 2. قيد تكلفة البضاعة المباعة وخصم المخزون
-            addJournalEntry(`إثبات تكلفة البضاعة المباعة ${prod.name}`, '5100', '1400', totalCOGS);
-
-            // تحديث كمية المخزون
-            prod.qty -= qty;
-
-            renderInventory();
-            renderJournal();
-            alert('تمت عملية البيع وترحيل القيود المحاسبية وتحديث المخزون بنجاح!');
-        }
-
-        // === 7. المحرك المحاسبي الشامل ===
-        function addJournalEntry(desc, drAccount, crAccount, amount) {
-            const entry = {
-                id: 'JV-' + (state.journal.length + 1).toString().padStart(4, '0'),
-                date: new Date().toLocaleDateString('ar-LY'),
-                desc,
-                drAccount,
-                crAccount,
-                amount: parseFloat(amount)
-            };
-            state.journal.push(entry);
-        }
-
-        function renderJournal() {
-            const tbody = document.getElementById('journal-table-body');
-            tbody.innerHTML = state.journal.map(j => {
-                const dr = state.accounts.find(a => a.code === j.drAccount)?.name;
-                const cr = state.accounts.find(a => a.code === j.crAccount)?.name;
-                return `
-                    <tr class="border-b">
-                        <td class="p-2 font-bold">${j.id}</td>
-                        <td class="p-2">${j.date}</td>
-                        <td class="p-2">${j.desc}</td>
-                        <td class="p-2 text-emerald-700 font-bold">${j.drAccount} - ${dr}</td>
-                        <td class="p-2 text-red-700 font-bold">${j.crAccount} - ${cr}</td>
-                        <td class="p-2 font-bold">${j.amount.toFixed(2)}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function renderCOA() {
-            const tbody = document.getElementById('coa-table-body');
-            tbody.innerHTML = state.accounts.map(a => {
-                const parentName = state.accounts.find(p => p.code === a.parent)?.name || '-';
-                return `
-                    <tr class="border-b">
-                        <td class="p-2 font-bold">${a.code}</td>
-                        <td class="p-2">${a.name}</td>
-                        <td class="p-2"><span class="px-2 py-0.5 rounded text-xs font-bold bg-gray-200">${a.type}</span></td>
-                        <td class="p-2 text-gray-500">${parentName}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function renderLedger() {
-            const code = document.getElementById('ledger-account-select').value;
-            const tbody = document.getElementById('ledger-table-body');
-            
-            let balance = 0;
-            let rows = [];
-
-            state.journal.forEach(j => {
-                if (j.drAccount === code || j.crAccount === code) {
-                    let dr = 0, cr = 0;
-                    if (j.drAccount === code) { dr = j.amount; balance += dr; }
-                    if (j.crAccount === code) { cr = j.amount; balance -= cr; }
-
-                    rows.push(`
-                        <tr class="border-b">
-                            <td class="p-2">${j.date}</td>
-                            <td class="p-2">${j.desc}</td>
-                            <td class="p-2 text-emerald-600 font-bold">${dr > 0 ? dr.toFixed(2) : '-'}</td>
-                            <td class="p-2 text-red-600 font-bold">${cr > 0 ? cr.toFixed(2) : '-'}</td>
-                            <td class="p-2 font-bold">${balance.toFixed(2)}</td>
-                        </tr>
-                    `);
-                }
-            });
-
-            tbody.innerHTML = rows.length > 0 ? rows.join('') : `<tr><td colspan="5" class="p-4 text-center text-gray-400">لا توجد حرّكات على هذا الحساب</td></tr>`;
-        }
-
-        function getAccountBalance(code) {
-            let balance = 0;
-            state.journal.forEach(j => {
-                if (j.drAccount === code) balance += j.amount;
-                if (j.crAccount === code) balance -= j.amount;
-            });
-            return balance;
-        }
-
-        function renderTrialBalance() {
-            const tbody = document.getElementById('tb-table-body');
-            const tfoot = document.getElementById('tb-table-foot');
-
-            let totalDr = 0, totalCr = 0;
-            let rows = [];
-
-            state.accounts.forEach(a => {
-                const bal = getAccountBalance(a.code);
-                if (bal !== 0) {
-                    let dr = bal > 0 ? bal : 0;
-                    let cr = bal < 0 ? Math.abs(bal) : 0;
-
-                    totalDr += dr;
-                    totalCr += cr;
-
-                    rows.push(`
-                        <tr class="border-b">
-                            <td class="p-2 font-bold">${a.code}</td>
-                            <td class="p-2">${a.name}</td>
-                            <td class="p-2 font-bold text-emerald-700">${dr > 0 ? dr.toFixed(2) : '0.00'}</td>
-                            <td class="p-2 font-bold text-red-700">${cr > 0 ? cr.toFixed(2) : '0.00'}</td>
-                        </tr>
-                    `);
-                }
-            });
-
-            tbody.innerHTML = rows.join('');
-            tfoot.innerHTML = `
-                <tr>
-                    <td colspan="2" class="p-2 text-left">الإجمالي المتوازن:</td>
-                    <td class="p-2 text-emerald-700 font-extrabold">${totalDr.toFixed(2)}</td>
-                    <td class="p-2 text-red-700 font-extrabold">${totalCr.toFixed(2)}</td>
-                </tr>
-            `;
-        }
-
-        function renderFinancialStatements() {
-            // 1. قائمة الدخل
-            const sales = Math.abs(getAccountBalance('4100'));
-            const cogs = getAccountBalance('5100');
-            const grossProfit = sales - cogs;
-            const freightExp = getAccountBalance('5200');
-            const netProfit = grossProfit - freightExp;
-
-            document.getElementById('stat-sales').innerText = sales.toFixed(2);
-            document.getElementById('stat-cogs').innerText = `(${cogs.toFixed(2)})`;
-            document.getElementById('stat-gross-profit').innerText = grossProfit.toFixed(2);
-            document.getElementById('stat-freight-exp').innerText = `(${freightExp.toFixed(2)})`;
-            document.getElementById('stat-net-profit').innerText = netProfit.toFixed(2);
-
-            // 2. الميزانية العمومية
-            const cash = getAccountBalance('1100');
-            const bank = getAccountBalance('1200');
-            const ar = getAccountBalance('1300');
-            const inv = getAccountBalance('1400');
-            const transit = getAccountBalance('1500');
-
-            const ap = Math.abs(getAccountBalance('2100'));
-            const capital = Math.abs(getAccountBalance('3100'));
-
-            const totalAssets = cash + bank + ar + inv + transit;
-            const totalLiabEq = ap + capital + netProfit;
-
-            document.getElementById('bs-cash').innerText = cash.toFixed(2);
-            document.getElementById('bs-bank').innerText = bank.toFixed(2);
-            document.getElementById('bs-ar').innerText = ar.toFixed(2);
-            document.getElementById('bs-inv').innerText = inv.toFixed(2);
-            document.getElementById('bs-transit').innerText = transit.toFixed(2);
-            document.getElementById('bs-total-assets').innerText = totalAssets.toFixed(2);
-
-            document.getElementById('bs-ap').innerText = ap.toFixed(2);
-            document.getElementById('bs-capital').innerText = capital.toFixed(2);
-            document.getElementById('bs-retained').innerText = netProfit.toFixed(2);
-            document.getElementById('bs-total-liab-eq').innerText = totalLiabEq.toFixed(2);
-        }
-
-        // === 8. إضافة حساب جديد وروافد النظام ===
-        function showAddAccountModal() {
-            document.getElementById('add-account-modal').classList.remove('hidden');
-        }
-        function closeAddAccountModal() {
-            document.getElementById('add-account-modal').classList.add('hidden');
-        }
-
-        function saveNewAccount(e) {
-            e.preventDefault();
-            const code = document.getElementById('acc-code').value;
-            const name = document.getElementById('acc-name').value;
-            const type = document.getElementById('acc-type').value;
-            const parent = document.getElementById('acc-parent').value || null;
-
-            state.accounts.push({ code, name, type, parent });
-            renderCOA();
-            updateSelectOptions();
-            closeAddAccountModal();
-        }
-
-        function updateSelectOptions() {
-            // تحديث خيارات اختيار المنتجات
-            const prodOpts = state.products.map(p => `<option value="${p.id}">${p.code} - ${p.name}</option>`).join('');
-            document.getElementById('po-product').innerHTML = prodOpts;
-            document.getElementById('sale-product').innerHTML = prodOpts;
-
-            // تحديث خيارات الحسابات الأب
-            const accOpts = state.accounts.map(a => `<option value="${a.code}">${a.code} - ${a.name}</option>`).join('');
-            document.getElementById('acc-parent').innerHTML = `<option value="">بدون (حساب رئيسي)</option>` + accOpts;
-            document.getElementById('ledger-account-select').innerHTML = accOpts;
-        }
-
-        function initApp() {
-            renderProducts();
-            renderInventory();
-            renderPendingOrders();
-            renderCOA();
-            renderJournal();
-            updateSelectOptions();
-        }
-    </script>
-</body>
-</html>
+        # التكلفة الجديدة للقطعة الواحدة = السعر الأساسي + (نصيبها من الشحن والجمارك ÷ الكمية)
+        new_unit_cost = base_price + ((item_ship + item_customs) / qty)
+
+        # تحديث تكلفة المنتج في المخزون وزيادة الكمية
+        cursor.execute("UPDATE products SET cost=?, stock = stock + ? WHERE code=?", (new_unit_cost, qty, p_code))
+
+      # قيد إثبات مصاريف الشحن والجمارك وسدادها
+      cursor.execute("INSERT INTO journal (date, entry_no, account_code, description, debit, credit) VALUES (?, ?, '121', ?, ?, 0)", 
+                     (date_now, po_no, f"اقفال البضاعة في الطريق والمصاريف للمخزون - {po_no}", ship_cost + customs_cost))
+      cursor.execute("INSERT INTO journal (date, entry_no, account_code, description, debit, credit) VALUES (?, ?, '112', ?, 0, ?)", 
+                     (date_now, po_no, f"سداد مصاريف شحن وجمرك - {po_no}", ship_cost + customs_cost))
+
+      cursor.execute("UPDATE purchase_orders SET status='Received', shipping_cost=?, customs_cost=? WHERE id=?", (ship_cost, customs_cost, po_id))
+      conn.commit()
+      messagebox.showinfo("نجاح", "تم استلام البضاعة وتوزيع الشحن والجمارك أوتوماتيكياً على تكلفة المخزون وتوليد القيود المحاسبية!")
+
+    tk.Button(dist_frame, text="تأكيد الاستلام وتوزيع التكاليف", bg="orange", fg="black", command=process_arrival).grid(row=3, column=0, columnspan=2, pady=10)
+
+  # --- المخزون ---
+  def open_inventory(self):
+    self.open_products()  # يعرض شاشة المنتجات والمخزون معاً
+
+  # --- المبيعات ---
+  def open_sales(self):
+    self.clear_window()
+    self.show_main_dashboard()
+
+    frame = tk.Frame(self.root)
+    frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+    tk.Label(frame, text="إدارة المبيعات وإصدار الفواتير", font=("Arial", 14, "bold")).pack(anchor="e", pady=5)
+
+    f = tk.Frame(frame)
+    f.pack(fill="x", pady=10)
+
+    tk.Label(f, text="رقم الفواتير:").grid(row=0, column=0)
+    e_inv = tk.Entry(f)
+    e_inv.grid(row=0, column=1)
+
+    tk.Label(f, text="كود المنتج:").grid(row=0, column=2)
+    e_pcode = tk.Entry(f)
+    e_pcode.grid(row=0, column=3)
+
+    tk.Label(f, text="الكمية المباعة:").grid(row=0, column=4)
+    e_qty = tk.Entry(f)
+    e_qty.grid(row=0, column=5)
+
+    def submit_sale():
+      inv_no = e_inv.get()
+      p_code = e_pcode.get()
+      try:
+        qty = float(e_qty.get())
+      except ValueError:
+        messagebox.showerror("خطأ", "الكمية غير صحيحة")
+        return
+
+      cursor.execute("SELECT price, cost, stock FROM products WHERE code=?", (p_code,))
+      res = cursor.fetchone()
+      if not res:
+        messagebox.showerror("خطأ", "المنتج غير موجود")
+        return
+      price, cost, stock = res
+
+      if stock < qty:
+        messagebox.showerror("خطأ", f"الكمية غير متوفرة في المخزون! المتاح: {stock}")
+        return
+
+      total_sale = price * qty
+      total_cost = cost * qty
+      date_now = datetime.now().strftime("%Y-%m-%d")
+
+      # خصم المخزون
+      cursor.execute("UPDATE products SET stock = stock - ? WHERE code=?", (qty, p_code))
+
+      # القيود المحاسبية التلقائية للمبيعات
+      # 1. إثبات الإيراد
+      cursor.execute("INSERT INTO journal (date, entry_no, account_code, description, debit, credit) VALUES (?, ?, '111', ?, ?, 0)", (date_now, inv_no, f"قيمة مبيعات فاتورة {inv_no}", total_sale))
+      cursor.execute("INSERT INTO journal (date, entry_no, account_code, description, debit, credit) VALUES (?, ?, '411', ?, 0, ?)", (date_now, inv_no, f"إيراد مبيعات {inv_no}", total_sale))
+      # 2. إثبات تكلفة البضاعة المباعة وخفض المخزون
+      cursor.execute("INSERT INTO journal (date, entry_no, account_code, description, debit, credit) VALUES (?, ?, '511', ?, ?, 0)", (date_now, inv_no, f"تكلفة بضاعة مباعة {inv_no}", total_cost))
+      cursor.execute("INSERT INTO journal (date, entry_no, account_code, description, debit, credit) VALUES (?, ?, '121', ?, 0, ?)", (date_now, inv_no, f"خروج مخزون فاتورة {inv_no}", total_cost))
+
+      conn.commit()
+      messagebox.showinfo("نجاح", "تمت عملية البيع وتوليد قيود المبيعات وتكلفة البضاعة المباعة تلقائياً!")
+
+    tk.Button(f, text="إتمام البيع وتوليد القيود", bg="blue", fg="white", command=submit_sale).grid(row=0, column=6, padx=10)
+
+  # --- المحاسبة والتقارير ---
+  def open_accounting(self):
+    self.clear_window()
+    self.show_main_dashboard()
+
+    frame = tk.Frame(self.root)
+    frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+    # تبويبات فرعية للمحاسبة
+    notebook = ttk.Notebook(frame)
+    notebook.pack(fill="both", expand=True)
+
+    # 1. دليل الحسابات
+    acc_frame = ttk.Frame(notebook)
+    notebook.add(acc_frame, text="دليل الحسابات")
+
+    cols = ("رقم الحساب", "اسم الحساب", "النوع")
+    acc_tree = ttk.Treeview(acc_frame, columns=cols, show="headings")
+    for col in cols:
+      acc_tree.heading(col, text=col)
+    acc_tree.pack(fill="both", expand=True, side="left")
+
+    def load_accounts():
+      for row in acc_tree.get_children():
+        acc_tree.delete(row)
+      cursor.execute("SELECT code, name, type FROM accounts")
+      for row in cursor.fetchall():
+        acc_tree.insert("", "end", values=row)
+
+    load_accounts()
+
+    add_acc_frame = tk.Frame(acc_frame)
+    add_acc_frame.pack(fill="y", side="right", padx=10)
+
+    tk.Label(add_acc_frame, text="إضافة حساب فرعي جديد", font=("Arial", 12, "bold")).pack(pady=5)
+    tk.Label(add_acc_frame, text="رقم الحساب:").pack()
+    e_acode = tk.Entry(add_acc_frame)
+    e_acode.pack()
+    tk.Label(add_acc_frame, text="اسم الحساب:").pack()
+    e_aname = tk.Entry(add_acc_frame)
+    e_aname.pack()
+    tk.Label(add_acc_frame, text="نوع الحساب (أصول/التزامات/إيرادات/مصروفات):").pack()
+    e_atype = tk.Entry(add_acc_frame)
+    e_atype.pack()
+
+    def add_sub_account():
+      try:
+        cursor.execute("INSERT INTO accounts (code, name, type) VALUES (?, ?, ?)", (e_acode.get(), e_aname.get(), e_atype.get()))
+        conn.commit()
+        load_accounts()
+        messagebox.showinfo("نجاح", "تمت إضافة الحساب بنجاح")
+      except Exception as e:
+        messagebox.showerror("خطأ", str(e))
+
+    tk.Button(add_acc_frame, text="إضافة الحساب", bg="green", fg="white", command=add_sub_account).pack(pady=10)
+
+    # 2. دفتر اليومية
+    journal_frame = ttk.Frame(notebook)
+    notebook.add(journal_frame, text="دفتر اليومية")
+
+    j_cols = ("التاريخ", "رقم القند/الحركة", "الحساب", "البيان", "مدين", "دائن")
+    j_tree = ttk.Treeview(journal_frame, columns=j_cols, show="headings")
+    for col in j_cols:
+      j_tree.heading(col, text=col)
+    j_tree.pack(fill="both", expand=True)
+
+    cursor.execute("SELECT j.date, j.entry_no, a.name, j.description, j.debit, j.credit FROM journal j JOIN accounts a ON j.account_code = a.code")
+    for row in cursor.fetchall():
+      j_tree.insert("", "end", values=row)
+
+    # 3. ميزان المراجعة
+    tb_frame = ttk.Frame(notebook)
+    notebook.add(tb_frame, text="ميزان المراجعة")
+
+    tb_cols = ("رقم الحساب", "اسم الحساب", "إجمالي المدين", "إجمالي الدائن", "الرصيد")
+    tb_tree = ttk.Treeview(tb_frame, columns=tb_cols, show="headings")
+    for col in tb_cols:
+      tb_tree.heading(col, text=col)
+    tb_tree.pack(fill="both", expand=True)
+
+    cursor.execute("SELECT a.code, a.name, SUM(j.debit), SUM(j.credit) FROM accounts a LEFT JOIN journal j ON a.code = j.account_code GROUP BY a.code")
+    for row in cursor.fetchall():
+      code, name, debit, credit = row
+      debit = debit or 0
+      credit = credit or 0
+      balance = debit - credit
+      tb_tree.insert("", "end", values=(code, name, debit, credit, balance))
+
+
+# تشغيل التطبيق
+if __name__ == "__main__":
+  root = tk.Tk()
+  app = ERPSystem(root)
+  root.mainloop()
