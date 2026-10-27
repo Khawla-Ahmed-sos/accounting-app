@@ -1,308 +1,485 @@
 <!DOCTYPE html>
-<html dir="rtl" lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>منظومة محاسبة</title>
-<style>
-  * {
-    box-sizing: border-box;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  }
-  body {
-    background-color: #f4f6f8;
-    margin: 0;
-    padding: 15px;
-    direction: rtl;
-  }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منظومة محاسبة متكاملة</title>
 
-  /* شاشة تسجيل الدخول */
-  #login-screen {
-    background: #ffffff;
-    max-width: 380px;
-    margin: 60px auto 0 auto;
-    padding: 30px 20px;
-    border-radius: 20px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-    text-align: center;
-    border: 1px solid #e2e8f0;
-  }
-  #login-screen h2 {
-    color: #1e293b;
-    margin-bottom: 8px;
-    font-size: 22px;
-  }
-  #login-screen p {
-    color: #64748b;
-    font-size: 13px;
-    margin-bottom: 25px;
-  }
-  .input-field {
-    width: 100%;
-    padding: 14px;
-    border: 1.5px solid #cbd5e1;
-    border-radius: 12px;
-    font-size: 16px;
-    text-align: center;
-    margin-bottom: 15px;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  .input-field:focus {
-    border-color: #2563eb;
-  }
-  .login-btn {
-    width: 100%;
-    background: #2563eb;
-    color: #ffffff;
-    border: none;
-    padding: 14px;
-    border-radius: 12px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(37,99,235,0.25);
-  }
-  .login-btn:active {
-    transform: scale(0.98);
-  }
-  #error-msg {
-    color: #ef4444;
-    font-size: 12px;
-    margin-top: 10px;
-    display: none;
-  }
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+            --success: #16a34a;
+            --danger: #dc2626;
+        }
 
-  /* التطبيق الرئيسي */
-  #main-app {
-    display: none;
-  }
-  .app-header {
-    background: #1e293b;
-    color: #ffffff;
-    padding: 15px 20px;
-    border-radius: 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    margin-bottom: 20px;
-  }
-  .app-title {
-    font-size: 18px;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .logout-btn {
-    background: rgba(255,255,255,0.15);
-    color: #fff;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    cursor: pointer;
-  }
-  .card {
-    background: #ffffff;
-    border-radius: 16px;
-    padding: 18px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    border: 1px solid #e2e8f0;
-  }
-  .card-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 15px;
-  }
-  .icon-box {
-    width: 48px;
-    height: 48px;
-    background: #eff6ff;
-    color: #2563eb;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-  }
-  .card-info h3 {
-    margin: 0;
-    font-size: 17px;
-    color: #0f172a;
-  }
-  .card-info p {
-    margin: 4px 0 0 0;
-    font-size: 12px;
-    color: #64748b;
-  }
-  .accounts-preview {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  details {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    overflow: hidden;
-  }
-  summary {
-    padding: 14px;
-    font-size: 15px;
-    color: #334155;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-right: 4px solid #2563eb;
-    cursor: pointer;
-    font-weight: 600;
-    list-style: none;
-  }
-  summary::-webkit-details-marker {
-    display: none;
-  }
-  .account-code {
-    font-size: 12px;
-    color: #64748b;
-    background: #e2e8f0;
-    padding: 3px 8px;
-    border-radius: 6px;
-  }
-  .sub-accounts {
-    background: #ffffff;
-    padding: 10px 15px;
-    border-top: 1px solid #e2e8f0;
-  }
-  .sub-item {
-    padding: 10px;
-    font-size: 13px;
-    color: #475569;
-    display: flex;
-    justify-content: space-between;
-    border-bottom: 1px dashed #f1f5f9;
-  }
-  .sub-item:last-child {
-    border-bottom: none;
-  }
-  .sub-code {
-    font-size: 11px;
-    color: #94a3b8;
-  }
-  .arrow {
-    font-size: 11px;
-    color: #2563eb;
-    margin-left: 8px;
-  }
-</style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            direction: rtl;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+        }
+
+        /* شاشة تسجيل الدخول */
+        #login-screen {
+            background: var(--card-bg);
+            padding: 30px 20px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        .login-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .form-group {
+            margin: 20px 0;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+            background: #fff;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--primary);
+        }
+
+        .btn {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            transition: 0.2s;
+        }
+
+        .btn:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+        }
+
+        /* المنظومة الرئيسية */
+        #app-screen {
+            display: none;
+        }
+
+        header {
+            background: #1e293b;
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            background: #e2e8f0;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            color: var(--text);
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 15px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* الدليل المحاسبي */
+        .account-group {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .account-header {
+            background: #f1f5f9;
+            padding: 12px 15px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .account-code {
+            background: #e2e8f0;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .sub-accounts {
+            padding: 10px 20px;
+            display: none;
+            background: #fff;
+        }
+
+        .sub-account-item {
+            padding: 8px 0;
+            border-bottom: 1px dashed var(--border);
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+
+        .sub-account-item:last-child {
+            border-bottom: none;
+        }
+
+        /* جدول دفتر اليومية */
+        .grid-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .full-width {
+            grid-column: span 2;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        th, td {
+            border: 1px solid var(--border);
+            padding: 10px;
+            text-align: center;
+        }
+
+        th {
+            background: #f1f5f9;
+        }
+
+        .badge-debit {
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        .badge-credit {
+            color: var(--danger);
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
 
-  <div id="login-screen">
-    <h2>📊 منظومة محاسبة</h2>
-    <p>أدخلي كلمة المرور للوصول إلى المنظومة</p>
-    <input type="password" id="pass-input" class="input-field" placeholder="كلمة المرور">
-    <button onclick="checkPass()" class="login-btn">دخول المنظومة</button>
-    <div id="error-msg">كلمة المرور غير صحيحة! حاول مجدداً</div>
-  </div>
+<div class="container">
 
-  <div id="main-app">
-    <div class="app-header">
-      <div class="app-title">📊 منظومة محاسبة</div>
-      <button onclick="logout()" class="logout-btn">قفل المنظومة</button>
-    </div>
-
-    <div class="card">
-      <div class="card-header">
-        <div class="icon-box">📂</div>
-        <div class="card-info">
-          <h3>الدليل المحاسبي</h3>
-          <p>اضغطي على أي حساب لتوسيع الحسابات الفرعية</p>
+    <!-- شاشة تسجيل الدخول -->
+    <div id="login-screen">
+        <div class="login-icon">📊</div>
+        <h2>منظومة محاسبة</h2>
+        <p style="color: #64748b; font-size: 14px; margin-top: 5px;">أدخلي كلمة المرور للوصول إلى المنظومة</p>
+        
+        <div class="form-group">
+            <input type="password" id="password-input" placeholder="كلمة المرور">
         </div>
-      </div>
-
-      <div class="accounts-preview">
-        <details>
-          <summary>
-            <span>1. الأصول <span class="arrow">◀</span></span>
-            <span class="account-code">#1000</span>
-          </summary>
-          <div class="sub-accounts">
-            <div class="sub-item"><span>• الخزينة الرئيسية</span> <span class="sub-code">#1101</span></div>
-            <div class="sub-item"><span>• حساب المصرف</span> <span class="sub-code">#1102</span></div>
-            <div class="sub-item"><span>• الذمم المدينة (العملاء)</span> <span class="sub-code">#1103</span></div>
-            <div class="sub-item"><span>• المخزون</span> <span class="sub-code">#1201</span></div>
-          </div>
-        </details>
-
-        <details>
-          <summary>
-            <span>2. الخصوم (الالتزامات) <span class="arrow">◀</span></span>
-            <span class="account-code">#2000</span>
-          </summary>
-          <div class="sub-accounts">
-            <div class="sub-item"><span>• الذمم الدائنة (الموردين)</span> <span class="sub-code">#2101</span></div>
-            <div class="sub-item"><span>• مصاريف مستحقة</span> <span class="sub-code">#2102</span></div>
-          </div>
-        </details>
-
-        <details>
-          <summary>
-            <span>3. حقوق الملكية <span class="arrow">◀</span></span>
-            <span class="account-code">#3000</span>
-          </summary>
-          <div class="sub-accounts">
-            <div class="sub-item"><span>• رأس المال</span> <span class="sub-code">#3101</span></div>
-            <div class="sub-item"><span>• الأرباح المبقاة</span> <span class="sub-code">#3201</span></div>
-          </div>
-        </details>
-
-        <details>
-          <summary>
-            <span>4. الإيرادات <span class="arrow">◀</span></span>
-            <span class="account-code">#4000</span>
-          </summary>
-          <div class="sub-accounts">
-            <div class="sub-item"><span>• إيرادات المبيعات</span> <span class="sub-code">#4101</span></div>
-            <div class="sub-item"><span>• إيرادات أخرى</span> <span class="sub-code">#4201</span></div>
-          </div>
-        </details>
-
-        <details>
-          <summary>
-            <span>5. المصروفات <span class="arrow">◀</span></span>
-            <span class="account-code">#5000</span>
-          </summary>
-          <div class="sub-accounts">
-            <div class="sub-item"><span>• مصروف إيجار</span> <span class="sub-code">#5101</span></div>
-            <div class="sub-item"><span>• مصروف مرتبات</span> <span class="sub-code">#5102</span></div>
-            <div class="sub-item"><span>• مصاريف عمومية وإدارية</span> <span class="sub-code">#5103</span></div>
-          </div>
-        </details>
-      </div>
+        
+        <button class="btn" onclick="checkPassword()">دخول المنظومة</button>
+        <p id="error-msg" style="color: var(--danger); font-size: 13px; margin-top: 10px; display: none;">كلمة المرور غير صحيحة!</p>
     </div>
-  </div>
 
-  <script>
-    function checkPass() {
-      const pass = document.getElementById('pass-input').value;
-      if (pass === '1234') {
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('main-app').style.display = 'block';
-        document.getElementById('error-msg').style.display = 'none';
-      } else {
-        document.getElementById('error-msg').style.display = 'block';
-      }
+    <!-- المنظومة الرئيسية -->
+    <div id="app-screen">
+        <header>
+            <h3>📊 منظومة محاسبة</h3>
+            <button class="btn btn-danger" onclick="logout()" style="width: auto; padding: 6px 12px; font-size: 13px;">قفل المنظومة</button>
+        </header>
+
+        <!-- التبويبات -->
+        <div class="nav-tabs">
+            <button class="tab-btn active" id="tab-chart-btn" onclick="switchTab('chart')">📂 الدليل المحاسبي</button>
+            <button class="tab-btn" id="tab-journal-btn" onclick="switchTab('journal')">📖 دفتر اليومية</button>
+        </div>
+
+        <!-- تبويب 1: الدليل المحاسبي -->
+        <div id="tab-chart" class="card">
+            <div class="card-title">📂 الدليل المحاسبي</div>
+            <p style="color: #64748b; font-size: 13px; margin-bottom: 15px;">اضغطي على أي حساب لتوسيع الحسابات الفرعية</p>
+
+            <div class="account-group">
+                <div class="account-header" onclick="toggleSub('sub-1')">
+                    <span>1. الأصول ◀</span>
+                    <span class="account-code">#1000</span>
+                </div>
+                <div class="sub-accounts" id="sub-1">
+                    <div class="sub-account-item"><span>1101 - النقدية بالخزينة</span></div>
+                    <div class="sub-account-item"><span>1102 - المصرف / البنك</span></div>
+                    <div class="sub-account-item"><span>1201 - المدينون / العملاء</span></div>
+                    <div class="sub-account-item"><span>1301 - المخزون</span></div>
+                </div>
+            </div>
+
+            <div class="account-group">
+                <div class="account-header" onclick="toggleSub('sub-2')">
+                    <span>2. الخصوم (الالتزامات) ◀</span>
+                    <span class="account-code">#2000</span>
+                </div>
+                <div class="sub-accounts" id="sub-2">
+                    <div class="sub-account-item"><span>2101 - الدائنون / الموردون</span></div>
+                    <div class="sub-account-item"><span>2201 - مصاريف مستحقة</span></div>
+                </div>
+            </div>
+
+            <div class="account-group">
+                <div class="account-header" onclick="toggleSub('sub-3')">
+                    <span>3. حقوق الملكية ◀</span>
+                    <span class="account-code">#3000</span>
+                </div>
+                <div class="sub-accounts" id="sub-3">
+                    <div class="sub-account-item"><span>3101 - رأس المال</span></div>
+                    <div class="sub-account-item"><span>3201 - الأرباح المبقاة</span></div>
+                </div>
+            </div>
+
+            <div class="account-group">
+                <div class="account-header" onclick="toggleSub('sub-4')">
+                    <span>4. الإيرادات ◀</span>
+                    <span class="account-code">#4000</span>
+                </div>
+                <div class="sub-accounts" id="sub-4">
+                    <div class="sub-account-item"><span>4101 - إيراد المبيعات</span></div>
+                    <div class="sub-account-item"><span>4201 - إيرادات أخرى</span></div>
+                </div>
+            </div>
+
+            <div class="account-group">
+                <div class="account-header" onclick="toggleSub('sub-5')">
+                    <span>5. المصروفات ◀</span>
+                    <span class="account-code">#5000</span>
+                </div>
+                <div class="sub-accounts" id="sub-5">
+                    <div class="sub-account-item"><span>5101 - مصروفات إدارية وعمومية</span></div>
+                    <div class="sub-account-item"><span>5201 - تكلفة المبيعات</span></div>
+                    <div class="sub-account-item"><span>5301 - مصروف الإيجار</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- تبويب 2: دفتر اليومية -->
+        <div id="tab-journal" class="card" style="display: none;">
+            <div class="card-title">📖 تسجيل قيد يومية جديد</div>
+            
+            <form id="journal-form" onsubmit="addEntry(event)">
+                <div class="grid-form">
+                    <div>
+                        <label style="font-size: 13px; font-weight: bold;">التاريخ:</label>
+                        <input type="date" id="entry-date" required>
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; font-weight: bold;">المبلغ (د.ل):</label>
+                        <input type="number" step="0.01" id="entry-amount" placeholder="0.00" required>
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; font-weight: bold;">من حـ/ (المدين):</label>
+                        <select id="debit-account" required>
+                            <option value="">اختر الحساب المدين</option>
+                            <option value="1101 - النقدية بالخزينة">1101 - النقدية بالخزينة</option>
+                            <option value="1102 - المصرف / البنك">1102 - المصرف / البنك</option>
+                            <option value="1201 - المدينون / العملاء">1201 - المدينون / العملاء</option>
+                            <option value="1301 - المخزون">1301 - المخزون</option>
+                            <option value="5101 - مصروفات إدارية">5101 - مصروفات إدارية</option>
+                            <option value="5301 - مصروف الإيجار">5301 - مصروف الإيجار</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size: 13px; font-weight: bold;">إلى حـ/ (الدائن):</label>
+                        <select id="credit-account" required>
+                            <option value="">اختر الحساب الدائن</option>
+                            <option value="4101 - إيراد المبيعات">4101 - إيراد المبيعات</option>
+                            <option value="1101 - النقدية بالخزينة">1101 - النقدية بالخزينة</option>
+                            <option value="1102 - المصرف / البنك">1102 - المصرف / البنك</option>
+                            <option value="2101 - الدائنون / الموردون">2101 - الدائنون / الموردون</option>
+                            <option value="3101 - رأس المال">3101 - رأس المال</option>
+                        </select>
+                    </div>
+                    <div class="full-width">
+                        <label style="font-size: 13px; font-weight: bold;">البيان / الشرح:</label>
+                        <input type="text" id="entry-desc" placeholder="شرح القيد (مثال: إيراد مبيعات اليوم)" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn">+ حفظ القيد</button>
+            </form>
+
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border);">
+
+            <div class="card-title">📋 سجل القيود اليومية</div>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>التاريخ</th>
+                            <th>البيان</th>
+                            <th>حـ/ المدين</th>
+                            <th>حـ/ الدائن</th>
+                            <th>المبلغ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="entries-table-body">
+                        <!-- القيود تظهر هنا -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    const CORRECT_PASS = "1234";
+    let journalEntries = JSON.parse(localStorage.getItem('journalEntries')) || [];
+
+    // تعيين تاريخ اليوم كافتراضي
+    document.getElementById('entry-date').valueAsDate = new Date();
+
+    function checkPassword() {
+        const input = document.getElementById('password-input').value;
+        const errorMsg = document.getElementById('error-msg');
+        
+        if (input === CORRECT_PASS) {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('app-screen').style.display = 'block';
+            renderEntries();
+        } else {
+            errorMsg.style.display = 'block';
+        }
     }
 
     function logout() {
-      document.getElementById('main-app').style.display = 'none';
-      document.getElementById('login-screen').style.display = 'block';
-      document.getElementById('pass-input').value = '';
+        document.getElementById('app-screen').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'block';
+        document.getElementById('password-input').value = '';
     }
-  </script>
+
+    function toggleSub(id) {
+        const el = document.getElementById(id);
+        el.style.display = (el.style.display === 'block') ? 'none' : 'block';
+    }
+
+    function switchTab(tab) {
+        document.getElementById('tab-chart').style.display = (tab === 'chart') ? 'block' : 'none';
+        document.getElementById('tab-journal').style.display = (tab === 'journal') ? 'block' : 'none';
+        
+        document.getElementById('tab-chart-btn').classList.toggle('active', tab === 'chart');
+        document.getElementById('tab-journal-btn').classList.toggle('active', tab === 'journal');
+    }
+
+    function addEntry(e) {
+        e.preventDefault();
+        const date = document.getElementById('entry-date').value;
+        const amount = parseFloat(document.getElementById('entry-amount').value).toFixed(2);
+        const debit = document.getElementById('debit-account').value;
+        const credit = document.getElementById('credit-account').value;
+        const desc = document.getElementById('entry-desc').value;
+
+        if (debit === credit) {
+            alert('لا يمكن أن يكون الحساب المدين والحساب الدائن هما نفس الحساب!');
+            return;
+        }
+
+        const newEntry = { date, amount, debit, credit, desc };
+        journalEntries.push(newEntry);
+        localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
+
+        document.getElementById('entry-desc').value = '';
+        document.getElementById('entry-amount').value = '';
+
+        renderEntries();
+        alert('تم حفظ القيد بنجاح!');
+    }
+
+    function renderEntries() {
+        const tbody = document.getElementById('entries-table-body');
+        tbody.innerHTML = '';
+
+        if (journalEntries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="color: #94a3b8;">لا توجد قيود مسجلة بعد</td></tr>';
+            return;
+        }
+
+        journalEntries.slice().reverse().forEach(entry => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${entry.date}</td>
+                <td>${entry.desc}</td>
+                <td class="badge-debit">${entry.debit}</td>
+                <td class="badge-credit">${entry.credit}</td>
+                <td style="font-weight: bold;">${entry.amount} د.ل</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+</script>
 
 </body>
 </html>
