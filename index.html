@@ -314,3 +314,47 @@
 
 </body>
 </html>
+
+<script>
+    // --- إضافة ميزة إدخال واختيار أكثر من صنف في المبيعات والمشتريات ---
+    (function() {
+        // إنشاء حاوية ديناميكية لإضافة صفوف متعددة للأصناف
+        window.AddNewItemRow = function(tableBodyId) {
+            const tbody = document.getElementById(tableBodyId);
+            if (!tbody) return;
+
+            const newRow = document.createElement("tr");
+            newRow.innerHTML = `
+                <td><input type="text" placeholder="اسم الصنف أو الكود" class="item-name-input" style="width: 100%; padding: 8px;"></td>
+                <td><input type="number" placeholder="الكمية" value="1" min="1" class="item-qty-input" style="width: 100%; padding: 8px;"></td>
+                <td><input type="number" placeholder="السعر" step="0.01" class="item-price-input" style="width: 100%; padding: 8px;"></td>
+                <td><button type="button" onclick="this.parentElement.parentElement.remove()" style="background: #dc3545; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer;">حذف</button></td>
+            `;
+            tbody.appendChild(newRow);
+        };
+
+        // دالة لحساب إجمالي الأصناف المتعددة تلقائياً
+        window.CalculateMultiItemsTotal = function(tableBodyId) {
+            const tbody = document.getElementById(tableBodyId);
+            if (!tbody) return 0;
+
+            let grandTotal = 0;
+            const rows = tbody.getElementsByTagName("tr");
+
+            for (let i = 0; i < rows.length; i++) {
+                const qtyInput = rows[i].querySelector(".item-qty-input");
+                const priceInput = rows[i].querySelector(".item-price-input");
+
+                if (qtyInput && priceInput) {
+                    let qty = parseFloat(qtyInput.value) || 0;
+                    let price = parseFloat(priceInput.value) || 0;
+                    grandTotal += (qty * price);
+                }
+            }
+            return grandTotal;
+        };
+
+        console.log("تم تفعيل كود الأصناف المتعددة بنجاح بجانب الكود السابق.");
+    })();
+</script>
+
