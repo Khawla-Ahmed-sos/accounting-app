@@ -1,617 +1,300 @@
-import sqlite3
-from datetime import datetime
-import tkinter as tk
-from tkinter import messagebox, ttk
-
-# --- قاعدة البيانات ---
-conn = sqlite3.connect("erp_system.db")
-cursor = conn.cursor()
-
-# إنشاء الجداول الأساسية
-cursor.executescript(
-    """
-CREATE TABLE IF NOT EXISTS users (
-    username TEXT,
-    password TEXT
-);
-INSERT INTO users SELECT 'admin', '1234' WHERE NOT EXISTS (SELECT * FROM users);
-
-CREATE TABLE IF NOT EXISTS accounts (
-    code TEXT PRIMARY KEY,
-    name TEXT,
-    type TEXT
-);
-
-CREATE TABLE IF NOT EXISTS products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    code TEXT UNIQUE,
-    name TEXT,
-    weight REAL,
-    color TEXT,
-    price REAL,
-    cost REAL DEFAULT 0,
-    stock REAL DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS journal (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT,
-    entry_no TEXT,
-    account_code TEXT,
-    description TEXT,
-    debit REAL,
-    credit REAL
-);
-
-CREATE TABLE IF NOT EXISTS purchase_orders (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    po_no TEXT,
-    supplier TEXT,
-    status TEXT, -- 'Ordered', 'InTransit', 'Received'
-    total_goods REAL,
-    shipping_cost REAL DEFAULT 0,
-    customs_cost REAL DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS purchase_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    po_id INTEGER,
-    product_code TEXT,
-    qty REAL,
-    price REAL,
-    weight REAL
-);
-"""
-)
-conn.commit()
-
-# إدخال الحسابات الافتراضية إذا كانت فارغة
-cursor.execute("SELECT COUNT(*) FROM accounts")
-if cursor.fetchone()[0] == 0:
-  default_accounts = [
-      ("111", "الصندوق (نقداً)", "أصول"),
-      ("112", "المصرف", "أصول"),
-      ("121", "المخزون", "أصول"),
-      ("122", "البضاعة في الطريق", "أصول"),
-      ("211", "الموردون", "التزامات"),
-      ("311", "رأس المال", "حقوق ملكية"),
-      ("411", "المبيعات", "إيرادات"),
-      ("511", "تكلفة البضاعة المباعة", "مصروفات"),
-      ("512", "مصروف نقل مشتريات (محلي)", "مصروفات"),
-  ]
-  cursor.executemany(
-      "INSERT INTO accounts (code, name, type) VALUES (?, ?, ?)",
-      default_accounts,
-  )
-  conn.commit()
-
-
-# --- الواجهة الرئيسية للبرنامج ---
-class ERPSystem:
-
-  def __init__(self, root):
-    self.root = root
-    self.root.title("منظومة ERP المتكاملة")
-    self.root.geometry("1100x700")
-    self.show_login_screen()
-
-  def clear_window(self):
-    for widget in self.root.winfo_children():
-      widget.destroy()
-
-  # 1. واجهة تسجيل الدخول
-  def show_login_screen(self):
-    self.clear_window()
-    frame = tk.Frame(self.root, bg="#f0f0f0")
-    frame.pack(expand=True, fill="both")
-
-    tk.Label(
-        frame,
-        text="تسجيل الدخول إلى منظومة ERP",
-        font=("Arial", 18, "bold"),
-        bg="#f0f0f0",
-    ).pack(pady=40)
-
-    tk.Label(
-        frame, text="كلمة المرور (1234):", font=("Arial", 12), bg="#f0f0f0"
-    ).pack(pady=5)
-    self.pass_entry = tk.Entry(frame, show="*", font=("Arial", 14), width=20)
-    self.pass_entry.pack(pady=5)
-
-    tk.Button(
-        frame,
-        text="دخول",
-        font=("Arial", 12, "bold"),
-        bg="#007bff",
-        fg="white",
-        width=15,
-        command=self.check_login,
-    ).pack(pady=20)
-
-  def check_login(self):
-    pwd = self.pass_entry.get()
-    cursor.execute("SELECT * FROM users WHERE password=?", (pwd,))
-    if cursor.fetchone() or pwd == "1234":
-      self.show_main_dashboard()
-    else:
-      messagebox.showerror("خطأ", "كلمة المرور غير صحيحة!")
-
-  # 2. اللوحة الرئيسية (النظام الداخلي)
-  def show_main_dashboard(self):
-    self.clear_window()
-
-    # شريط القوائم العلوي
-    menubar = tk.Menu(self.root)
-    self.root.config(menu=menubar)
-
-    menubar.add_command(label="المنتجات والأسعار", command=self.open_products)
-    menubar.add_command(label="المشتريات والشحن", command=self.open_purchases)
-    menubar.add_command(label="المخزون", command=self.open_inventory)
-    menubar.add_command(label="المبيعات", command=self.open_sales)
-    menubar.add_command(label="المحاسبة والتقارير", command=self.open_accounting)
-    menubar.add_command(label="خروج", command=self.show_login_screen)
-
-    # الواجهة الافتراضية عند الدخول
-    self.main_frame = tk.Frame(self.root)
-    self.main_frame.pack(expand=True, fill="both")
-    tk.Label(
-        self.main_frame,
-        text="مرحباً بك في منظومة ERP المحاسبية المتكاملة",
-        font=("Arial", 18, "bold"),
-    ).pack(expand=True)
-
-  # --- إدارة المنتجات ---
-  def open_products(self):
-    self.clear_window()
-    self.show_main_dashboard()
-
-    frame = tk.Frame(self.root)
-    frame.pack(fill="both", expand=True, padx=20, pady=20)
-
-    tk.Label(
-        frame, text="إدارة المنتجات والأسعار", font=("Arial", 14, "bold")
-    ).pack(anchor="e", pady=5)
-
-    form_frame = tk.Frame(frame)
-    form_frame.pack(fill="x", pady=10)
-
-    tk.Label(form_frame, text="وصف المنتج:").grid(
-        row=0, column=5, padx=5, sticky="e"
-    )
-    e_name = tk.Entry(form_frame)
-    e_name.grid(row=0, column=4, padx=5)
-
-    tk.Label(form_frame, text="الوزن (كجم):").grid(
-        row=0, column=3, padx=5, sticky="e"
-    )
-    e_weight = tk.Entry(form_frame)
-    e_weight.grid(row=0, column=2, padx=5)
-
-    tk.Label(form_frame, text="اللون:").grid(
-        row=0, column=1, padx=5, sticky="e"
-    )
-    e_color = tk.Entry(form_frame)
-    e_color.grid(row=0, column=0, padx=5)
-
-    tk.Label(form_frame, text="السعر (إلزامي):").grid(
-        row=1, column=5, padx=5, sticky="e", pady=5
-    )
-    e_price = tk.Entry(form_frame)
-    e_price.grid(row=1, column=4, padx=5, pady=5)
-
-    def save_product():
-      if not e_price.get():
-        messagebox.showerror("خطأ", "سعر المنتج إلزامي!")
-        return
-      try:
-        price = float(e_price.get())
-        weight = float(e_weight.get() or 0)
-      except ValueError:
-        messagebox.showerror("خطأ", "يرجى إدخال أرقام صحيحة للسعر والوزن!")
-        return
-
-      # إنشاء كود المنتج تلقائياً
-      cursor.execute("SELECT COUNT(*) FROM products")
-      count = cursor.fetchone()[0] + 1
-      code = f"PRD-{count:04d}"
-
-      cursor.execute(
-          "INSERT INTO products (code, name, weight, color, price) VALUES"
-          " (?, ?, ?, ?, ?)",
-          (code, e_name.get(), weight, e_color.get(), price),
-      )
-      conn.commit()
-      messagebox.SUCCESS(
-          "نجاح", f"تم إضافة المنتج بنجاح، والكود المنشأ هو: {code}"
-      )
-      refresh_table()
-
-    tk.Button(
-        form_frame,
-        text="حفظ المنتج",
-        bg="green",
-        fg="white",
-        command=save_product,
-    ).grid(row=1, column=0, columnspan=2, pady=5)
-
-    # جدول عرض المنتجات
-    cols = ("الكود", "الوصف", "الوزن", "اللون", "السعر", "التكلفة", "المخزون")
-    tree = ttk.Treeview(frame, columns=cols, show="headings")
-    for col in cols:
-      tree.heading(col, text=col)
-    tree.pack(fill="both", expand=True, pady=10)
-
-    def refresh_table():
-      for row in tree.get_children():
-        tree.delete(row)
-      cursor.execute(
-          "SELECT code, name, weight, color, price, cost, stock FROM products"
-      )
-      for row in cursor.fetchall():
-        tree.insert("", "end", values=row)
-
-    refresh_table()
-
-  # --- المشتريات والشحن المتقدم ---
-  def open_purchases(self):
-    self.clear_window()
-    self.show_main_dashboard()
-
-    frame = tk.Frame(self.root)
-    frame.pack(fill="both", expand=True, padx=20, pady=20)
-
-    tk.Label(
-        frame, text="إدارة المشتريات والشحن والجمرك", font=("Arial", 14, "bold")
-    ).pack(anchor="e", pady=5)
-
-    # نموذج طلب الشراء
-    f_frame = tk.Frame(frame)
-    f_frame.pack(fill="x", pady=5)
-
-    tk.Label(f_frame, text="رقم طلب الشراء:").grid(row=0, column=5)
-    e_po = tk.Entry(f_frame)
-    e_po.grid(row=0, column=4)
-
-    tk.Label(f_frame, text="المورد:").grid(row=0, column=3)
-    e_sup = tk.Entry(f_frame)
-    e_sup.grid(row=0, column=2)
-
-    tk.Label(f_frame, text="طريقة السداد:").grid(row=0, column=1)
-    pay_method = ttk.Combobox(
-        f_frame, values=["نقداً", "مصرف", "آجل"], state="readonly"
-    )
-    pay_method.grid(row=0, column=0)
-    pay_method.current(0)
-
-    # إضافة أصناف لطلب الشراء
-    items_frame = tk.LabelFrame(
-        frame, text="أصناف الشحنة في الطريق / المستلمة"
-    )
-    items_frame.pack(fill="x", pady=10)
-
-    tk.Label(items_frame, text="كود المنتج:").grid(row=0, column=0)
-    e_pcode = tk.Entry(items_frame)
-    e_pcode.grid(row=0, column=1)
-
-    tk.Label(items_frame, text="الكمية:").grid(row=0, column=2)
-    e_qty = tk.Entry(items_frame)
-    e_qty.grid(row=0, column=3)
-
-    tk.Label(items_frame, text="سعر الشراء الفردي:").grid(row=0, column=4)
-    e_pprice = tk.Entry(items_frame)
-    e_pprice.grid(row=0, column=5)
-
-    temp_items = []
-
-    def add_item_to_list():
-      code = e_pcode.get()
-      try:
-        qty = float(e_qty.get())
-        price = float(e_pprice.get())
-      except ValueError:
-        messagebox.showerror("خطأ", "الكمية والسعر يجب أن يكونا أرقاماً")
-        return
-
-      cursor.execute("SELECT weight FROM products WHERE code=?", (code,))
-      res = cursor.fetchone()
-      if not res:
-        messagebox.showerror("خطأ", "كود المنتج غير موجود!")
-        return
-      weight = res[0] * qty
-
-      temp_items.append((code, qty, price, weight))
-      messagebox.showinfo("تم", "تمت الإضافة للقائمة المؤقتة للشراء")
-
-    tk.Button(
-        items_frame, text="إضافة للصنف", command=add_item_to_list
-    ).grid(row=0, column=6, padx=10)
-
-    def submit_po():
-      if not temp_items:
-        messagebox.showerror("خطأ", "لم تتم إضافة أي أصناف!")
-        return
-
-      total_goods = sum([i[1] * i[2] for i in temp_items])
-      po_no = e_po.get()
-
-      # تسجيل قيد المشتريات الآلي (من ح/ البضاعة في الطريق أو المخزون إلى ح/ المورد أو الصندوق)
-      cursor.execute(
-          "INSERT INTO purchase_orders (po_no, supplier, status, total_goods)"
-          " VALUES (?, ?, 'InTransit', ?)",
-          (po_no, e_sup.get(), total_goods),
-      )
-      po_id = cursor.lastrowid
-
-      for item in temp_items:
-        cursor.execute(
-            "INSERT INTO purchase_items (po_id, product_code, qty, price,"
-            " weight) VALUES (?, ?, ?, ?, ?)",
-            (po_id, item[0], item[1], item[2], item[3]),
-        )
-
-      # القيد المحاسبي التلقائي
-      p_type = pay_method.get()
-      cr_acc = (
-          "211" if p_type == "آجل" else ("111" if p_type == "نقداً" else "112")
-      )
-      date_now = datetime.now().strftime("%Y-%m-%d")
-
-      cursor.execute(
-          "INSERT INTO journal (date, entry_no, account_code, description,"
-          " debit, credit) VALUES (?, ?, '122', ?, ?, 0)",
-          (date_now, po_no, f"اثبات بضاعة في الطريق لطلب {po_no}", total_goods),
-      )
-      cursor.execute(
-          "INSERT INTO journal (date, entry_no, account_code, description,"
-          " debit, credit) VALUES (?, ?, ?, ?, 0, ?)",
-          (date_now, po_no, cr_acc, f"سداد/التزام طلب شراء {po_no}", total_goods),
-      )
-      conn.commit()
-      messagebox.showinfo(
-          "نجاح",
-          "تم إصدار أمر الشراء وتسجيل البضاعة في الطريق وتوليد القيود أوتوماتيكياً!",
-      )
-
-    tk.Button(
-        frame,
-        text="اعتماد طلب الشراء",
-        bg="blue",
-        fg="white",
-        command=submit_po,
-    ).pack(pady=5)
-
-    # معالجة وصول الشحنة ومصاريف الشحن والجمرك الموزعة أوتوماتيكياً
-    dist_frame = tk.LabelFrame(
-        frame, text="استلام الشحنة وتوزيع مصاريف الشحن الدولي والجمارك أوتوماتيكياً"
-    )
-    dist_frame.pack(fill="x", pady=10)
-
-    tk.Label(dist_frame, text="رقم طلب الشراء المراد استلامه:").grid(
-        row=0, column=0
-    )
-    e_po_rcv = tk.Entry(dist_frame)
-    e_po_rcv.grid(row=0, column=1)
-
-    tk.Label(
-        dist_frame, text="إجمالي مصاريف الشحن الدولي (توزع أوتوماتيك بالوزن):"
-    ).grid(row=1, column=0)
-    e_ship = tk.Entry(dist_frame)
-    e_ship.grid(row=1, column=1)
-
-    tk.Label(dist_frame, text="إجمالي مصاريف الجمرك (توزع أوتوماتيك بالنسبة):") \
-        .grid(row=2, column=0)
-    e_customs = tk.Entry(dist_frame)
-    e_customs.grid(row=2, column=1)
-
-    def process_arrival():
-      po_no = e_po_rcv.get()
-      try:
-        ship_cost = float(e_ship.get() or 0)
-        customs_cost = float(e_customs.get() or 0)
-      except ValueError:
-        messagebox.showerror("خطأ", "المصاريف يجب أن تكون أرقاماً")
-        return
-
-      cursor.execute("SELECT id, total_goods FROM purchase_orders WHERE po_no=?", (po_no,))
-      po_res = cursor.fetchone()
-      if not po_res:
-        messagebox.showerror("خطأ", "رقم الطلب غير موجود!")
-        return
-      po_id, total_goods = po_res
-
-      # جلب أصناف الطلب وأوزانها
-      cursor.execute("SELECT product_code, qty, price, weight FROM purchase_items WHERE po_id=?", (po_id,))
-      items = cursor.fetchall()
-      total_weight = sum([i[3] for i in items])
-
-      date_now = datetime.now().strftime("%Y-%m-%d")
-
-      # توزيع الشحن الدولي والجمارك على تكلفة المنتجات وتحديث المخزون
-      for item in items:
-        p_code, qty, base_price, item_weight = item
-        # حصة الصنف من الشحن بناء على الوزن
-        item_ship = (item_weight / total_weight) * ship_cost if total_weight > 0 else 0
-        # حصة الصنف من الجمارك بناء على القيمة النسبية
-        item_customs = ( (qty * base_price) / total_goods ) * customs_cost if total_goods > 0 else 0
+import os
+
+# تخزين البيانات في الذاكرة (يمكن استبدالها بقاعدة بيانات لاحقاً)
+inventory = {}       # المخزن: {اسم_الصنف: {"qty": الكمية, "buy_price": سعر_الشراء, "sell_price": سعر_بيع}}
+purchases = []       # سجل المشتريات
+sales = []           # سجل المبيعات
+
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def show_header(title):
+    print("=" * 60)
+    print(f"         {title}         ")
+    print("=" * 60)
+
+# 1. إدارة المخزن والاصناف
+def manage_inventory():
+    while True:
+        clear_screen()
+        show_header("إدارة المخزن والأصناف")
+        print("1. عرض الأصناف بالمخزن")
+        print("2. إضافة صنف جديد أو تحديث كمية/سعر")
+        print("3. الرجوع القائمة الرئيسية")
         
-        # التكلفة الجديدة للقطعة الواحدة = السعر الأساسي + (نصيبها من الشحن والجمارك ÷ الكمية)
-        new_unit_cost = base_price + ((item_ship + item_customs) / qty)
+        choice = input("\nاختر رقماً: ").strip()
+        
+        if choice == '1':
+            clear_screen()
+            show_header("قائمة المخزن الحالية")
+            if not inventory:
+                print("المخزن فارغ تماماً.")
+            else:
+                print(f"{'اسم الصنف':<20} | {'الكمية':<10} | {'سعر الشراء':<12} | {'سعر البيع':<12}")
+                print("-" * 60)
+                for item, data in inventory.items():
+                    print(f"{item:<20} | {data['qty']:<10} | {data['buy_price']:<12} | {data['sell_price']:<12}")
+            input("\nاضغط Enter للمتابعة...")
+            
+        elif choice == '2':
+            clear_screen()
+            show_header("إضافة / تحديث صنف")
+            name = input("اسم الصنف: ").strip()
+            if not name:
+                print("اسم الصنف لا يمكن أن يكون فارغاً!")
+                input("\nاضغط Enter للمتابعة...")
+                continue
+            
+            try:
+                qty = int(input("الكمية المضافة: "))
+                buy_price = float(input("سعر الشراء للوحدة: "))
+                sell_price = float(input("سعر البيع للوحدة: "))
+            except ValueError:
+                print("خطأ: يجيب إدخال أرقام صحيحة للكمية والأسعار.")
+                input("\nاضغط Enter للمتابعة...")
+                continue
+            
+            if name in inventory:
+                inventory[name]['qty'] += qty
+                inventory[name]['buy_price'] = buy_price
+                inventory[name]['sell_price'] = sell_price
+                print(f"\nتم تحديث بيانات الصنف ({name}) بنجاح!")
+            else:
+                inventory[name] = {
+                    "qty": qty,
+                    "buy_price": buy_price,
+                    "sell_price": sell_price
+                }
+                print(f"\nتم إضافة الصنف الجديد ({name}) بنجاح!")
+            input("\nاضغط Enter للمتابعة...")
+            
+        elif choice == '3':
+            break
 
-        # تحديث تكلفة المنتج في المخزون وزيادة الكمية
-        cursor.execute("UPDATE products SET cost=?, stock = stock + ? WHERE code=?", (new_unit_cost, qty, p_code))
+# 2. فاتورة المشتريات (تتيح إضافة عدة أصناف)
+def create_purchase_invoice():
+    while True:
+        clear_screen()
+        show_header("إنشاء فاتورة مشتريات جديدة (عدة أصناف)")
+        
+        supplier = input("اسم المورد: ").strip()
+        invoice_items = []
+        
+        while True:
+            print("\n--- إضافة صنف للفاتورة ---")
+            item_name = input("اسم الصنف: ").strip()
+            if not item_name:
+                print("اسم الصنف مطلوب.")
+                continue
+            
+            try:
+                qty = int(input("الكمية المشتراة: "))
+                buy_price = float(input("سعر الشراء للوحدة: "))
+            except ValueError:
+                print("الرجاء إدخال أرقام صحيحة للكمية والسعر.")
+                continue
+            
+            invoice_items.append({
+                "item": item_name,
+                "qty": qty,
+                "buy_price": buy_price,
+                "total": qty * buy_price
+            })
+            
+            # تحديث المخزن تلقائياً
+            if item_name in inventory:
+                inventory[item_name]['qty'] += qty
+                inventory[item_name]['buy_price'] = buy_price
+            else:
+                # إذا لم يكن سعر البيع محدداً بعد، نجعله افتراضياً مساوياً لسعر الشراء مبدئياً
+                inventory[item_name] = {
+                    "qty": qty,
+                    "buy_price": buy_price,
+                    "sell_price": buy_price * 1.2  # هامش ربح افتراضي 20%
+                }
+            
+            cont = input("\nهل تريد إضافة صنف آخر لهذه الفاتورة؟ (y/n): ").strip().lower()
+            if cont != 'y':
+                break
+        
+        if invoice_items:
+            invoice_total = sum(i['total'] for i in invoice_items)
+            purchases.append({
+                "supplier": supplier,
+                "items": invoice_items,
+                "total_invoice": invoice_total
+            })
+            
+            clear_screen()
+            show_header("تفاصيل فاتورة المشتريات المعتمدة")
+            print(للمورد: فلان / المورد: {supplier})
+            print(f"{'الصنف':<20} | {'الكمية':<8} | {'السعر':<10} | {'الإجمالي':<10}")
+            print("-" * 52)
+            for i in invoice_items:
+                print(f"{i['item']:<20} | {i['qty']:<8} | {i['buy_price']:<10} | {i['total']:<10}")
+            print("-" * 52)
+            print(f"إجمالي الفاتورة الكلي: {invoice_total}")
+            print("\nتم حفظ فاتورة المشتريات وتحديث المخزن بنجاح!")
+        
+        choice = input("\nهل تريد إنشاء فاتورة مشتريات أخرى؟ (y/n): ").strip().lower()
+        if choice != 'y':
+            break
 
-      # قيد إثبات مصاريف الشحن والجمارك وسدادها
-      cursor.execute("INSERT INTO journal (date, entry_no, account_code, description, debit, credit) VALUES (?, ?, '121', ?, ?, 0)", 
-                     (date_now, po_no, f"اقفال البضاعة في الطريق والمصاريف للمخزون - {po_no}", ship_cost + customs_cost))
-      cursor.execute("INSERT INTO journal (date, entry_no, account_code, description, debit, credit) VALUES (?, ?, '112', ?, 0, ?)", 
-                     (date_now, po_no, f"سداد مصاريف شحن وجمرك - {po_no}", ship_cost + customs_cost))
+# 3. فاتورة المبيعات (تتيح إضافة عدة أصناف مع فحص المخزن)
+def create_sales_invoice():
+    while True:
+        clear_screen()
+        show_header("إنشاء فاتورة مبيعات جديدة (عدة أصناف)")
+        
+        customer = input("اسم العميل: ").strip()
+        invoice_items = []
+        
+        while True:
+            print("\n--- إضافة صنف لفاتورة البيع ---")
+            item_name = input("اسم الصنف المطلوب: ").strip()
+            
+            if item_name not in inventory:
+                print(f"خطأ: الصنف '{item_name}' غير موجود بالمخزن أساساً!")
+                cont_err = input("هل تريد محاولة صنف آخر؟ (y/n): ").strip().lower()
+                if cont_err == 'y':
+                    continue
+                else:
+                    break
+            
+            available_qty = inventory[item_name]['qty']
+            print(f"الكمية المتاحة بالمخزن من ({item_name}) هي: {available_qty}")
+            
+            try:
+                qty = int(input("الكمية المراد بيعها: "))
+            except ValueError:
+                print("الرجاء إدخال رقم صحيح.")
+                continue
+            
+            if qty > available_qty:
+                print(f"عذراً! الكمية المطلوبة غير متوفرة (المتاح فقط: {available_qty}).")
+                continue
+            
+            # استخدام سعر البيع المخزن أو السماح بتعديله
+            default_sell_price = inventory[item_name]['sell_price']
+            price_input = input(f"سعر بيع الوحدة (اضغط Enter للاستفادة بالسعر الافتراضي {default_sell_price}): ").strip()
+            
+            sell_price = float(price_input) if price_input else default_sell_price
+            
+            # خصم الكمية من المخزن فورا
+            inventory[item_name]['qty'] -= qty
+            
+            invoice_items.append({
+                "item": item_name,
+                "qty": qty,
+                "sell_price": sell_price,
+                "total": qty * sell_price
+            })
+            
+            cont = input("\nهل تريد إضافة صنف آخر لهذه الفاتورة؟ (y/n): ").strip().lower()
+            if cont != 'y':
+                break
+        
+        if invoice_items:
+            invoice_total = sum(i['total'] for i in invoice_items)
+            sales.append({
+                "customer": customer,
+                "items": invoice_items,
+                "total_invoice": invoice_total
+            })
+            
+            clear_screen()
+            show_header("فاتورة المبيعات الصادرة")
+            print(f"اسم العميل: {customer}")
+            print(f"{'الصنف':<20} | {'الكمية':<8} | {'السعر':<10} | {'الإجمالي':<10}")
+            print("-" * 52)
+            for i in invoice_items:
+                print(f"{i['item']:<20} | {i['qty']:<8} | {i['sell_price']:<10} | {i['total']:<10}")
+            print("-" * 52)
+            print(f"إجمالي الفاتورة الكلي: {invoice_total}")
+            print("\nتم إصدار فاتورة المبيعات و خصم الكميات من المخزن بنجاح!")
+        
+        choice = input("\nهل تريد إنشاء فاتورة مبيعات أخرى؟ (y/n): ").strip().lower()
+        if choice != 'y':
+            break
 
-      cursor.execute("UPDATE purchase_orders SET status='Received', shipping_cost=?, customs_cost=? WHERE id=?", (ship_cost, customs_cost, po_id))
-      conn.commit()
-      messagebox.showinfo("نجاح", "تم استلام البضاعة وتوزيع الشحن والجمارك أوتوماتيكياً على تكلفة المخزون وتوليد القيود المحاسبية!")
+# 4. التقارير المالية والحركة
+def show_reports():
+    while True:
+        clear_screen()
+        show_header("التقارير المالية والحركة")
+        print("1. تقرير المشتريات السابقة")
+        print("2. تقرير المبيعات السابقة")
+        print("3. ملخص الحسابات والأرباح التقديرية")
+        print("4. الرجوع للقائمة الرئيسية")
+        
+        choice = input("\nاختر رقماً: ").strip()
+        
+        if choice == '1':
+            clear_screen()
+            show_header("سجل فواتير المشتريات")
+            if not purchases:
+                print("لا توجد فواتير مشتريات مسجلة بعد.")
+            else:
+                for idx, p in enumerate(purchases, 1):
+                    print(للمورد: f"\nفاتورة #{idx} | المورد: {p['supplier']} | الإجمالي الكلي: {p['total_invoice']}")
+                    for item in p['items']:
+                        print(f"   - {item['item']} (الكمية: {item['qty']}, سعر الوحدة: {item['buy_price']})")
+            input("\nاضغط Enter للمتابعة...")
+            
+        elif choice == '2':
+            clear_screen()
+            show_header("سجل فواتير المبيعات")
+            if not sales:
+                print("لا توجد فواتير مبيعات مسجلة بعد.")
+            else:
+                for idx, s in enumerate(sales, 1):
+                    print(f"\nفاتورة #{idx} | العميل: {s['customer']} | الإجمالي الكلي: {s['total_invoice']}")
+                    for item in s['items']:
+                        print(f"   - {item['item']} (الكمية: {item['qty']}, سعر البيع: {item['sell_price']})")
+            input("\nاضغط Enter للمتابعة...")
+            
+        elif choice == '3':
+            clear_screen()
+            show_header("الملخص المالي العام")
+            total_purchases_val = sum(p['total_invoice'] for p in purchases)
+            total_sales_val = sum(s['total_invoice'] for s in sales)
+            
+            print(f"إجمالي قيمة المشتريات الكلية: {total_purchases_val}")
+            print(f"إجمالي قيمة المبيعات الكلية: {total_sales_val}")
+            print(f"السيولة التقديرية (المبيعات - المشتريات): {total_sales_val - total_purchases_val}")
+            input("\nاضغط Enter للمتابعة...")
+            
+        elif choice == '4':
+            break
 
-    tk.Button(dist_frame, text="تأكيد الاستلام وتوزيع التكاليف", bg="orange", fg="black", command=process_arrival).grid(row=3, column=0, columnspan=2, pady=10)
+# القائمة الرئيسية للمنظومة
+def main_menu():
+    while True:
+        clear_screen()
+        show_header("منظومة الحسابات والمخازن المتكاملة")
+        print("1. إدارة المخزن والأصناف")
+        print("2. إنشاء فاتورة مشتريات (متعددة الأصناف)")
+        print("3. إنشاء فاتورة مبيعات (متعددة الأصناف)")
+        print("4. التقارير والسجلات المالية")
+        print("5. إغلاق المنظومة والخروج")
+        
+        choice = input("\nاختر رقم العملية المطلوبة: ").strip()
+        
+        if choice == '1':
+            manage_inventory()
+        elif choice == '2':
+            create_purchase_invoice()
+        elif choice == '3':
+            create_sales_invoice()
+        elif choice == '4':
+            show_reports()
+        elif choice == '5':
+            clear_screen()
+            print("شكراً لاستخدامك منظومة الحسابات. إلى اللقاء!")
+            break
+        else:
+            print("خيار غير صحيح، الرجاء اختيار رقم من 1 إلى 5.")
+            input("\nاضغط Enter للمتابعة...")
 
-  # --- المخزون ---
-  def open_inventory(self):
-    self.open_products()  # يعرض شاشة المنتجات والمخزون معاً
-
-  # --- المبيعات ---
-  def open_sales(self):
-    self.clear_window()
-    self.show_main_dashboard()
-
-    frame = tk.Frame(self.root)
-    frame.pack(fill="both", expand=True, padx=20, pady=20)
-
-    tk.Label(frame, text="إدارة المبيعات وإصدار الفواتير", font=("Arial", 14, "bold")).pack(anchor="e", pady=5)
-
-    f = tk.Frame(frame)
-    f.pack(fill="x", pady=10)
-
-    tk.Label(f, text="رقم الفواتير:").grid(row=0, column=0)
-    e_inv = tk.Entry(f)
-    e_inv.grid(row=0, column=1)
-
-    tk.Label(f, text="كود المنتج:").grid(row=0, column=2)
-    e_pcode = tk.Entry(f)
-    e_pcode.grid(row=0, column=3)
-
-    tk.Label(f, text="الكمية المباعة:").grid(row=0, column=4)
-    e_qty = tk.Entry(f)
-    e_qty.grid(row=0, column=5)
-
-    def submit_sale():
-      inv_no = e_inv.get()
-      p_code = e_pcode.get()
-      try:
-        qty = float(e_qty.get())
-      except ValueError:
-        messagebox.showerror("خطأ", "الكمية غير صحيحة")
-        return
-
-      cursor.execute("SELECT price, cost, stock FROM products WHERE code=?", (p_code,))
-      res = cursor.fetchone()
-      if not res:
-        messagebox.showerror("خطأ", "المنتج غير موجود")
-        return
-      price, cost, stock = res
-
-      if stock < qty:
-        messagebox.showerror("خطأ", f"الكمية غير متوفرة في المخزون! المتاح: {stock}")
-        return
-
-      total_sale = price * qty
-      total_cost = cost * qty
-      date_now = datetime.now().strftime("%Y-%m-%d")
-
-      # خصم المخزون
-      cursor.execute("UPDATE products SET stock = stock - ? WHERE code=?", (qty, p_code))
-
-      # القيود المحاسبية التلقائية للمبيعات
-      # 1. إثبات الإيراد
-      cursor.execute("INSERT INTO journal (date, entry_no, account_code, description, debit, credit) VALUES (?, ?, '111', ?, ?, 0)", (date_now, inv_no, f"قيمة مبيعات فاتورة {inv_no}", total_sale))
-      cursor.execute("INSERT INTO journal (date, entry_no, account_code, description, debit, credit) VALUES (?, ?, '411', ?, 0, ?)", (date_now, inv_no, f"إيراد مبيعات {inv_no}", total_sale))
-      # 2. إثبات تكلفة البضاعة المباعة وخفض المخزون
-      cursor.execute("INSERT INTO journal (date, entry_no, account_code, description, debit, credit) VALUES (?, ?, '511', ?, ?, 0)", (date_now, inv_no, f"تكلفة بضاعة مباعة {inv_no}", total_cost))
-      cursor.execute("INSERT INTO journal (date, entry_no, account_code, description, debit, credit) VALUES (?, ?, '121', ?, 0, ?)", (date_now, inv_no, f"خروج مخزون فاتورة {inv_no}", total_cost))
-
-      conn.commit()
-      messagebox.showinfo("نجاح", "تمت عملية البيع وتوليد قيود المبيعات وتكلفة البضاعة المباعة تلقائياً!")
-
-    tk.Button(f, text="إتمام البيع وتوليد القيود", bg="blue", fg="white", command=submit_sale).grid(row=0, column=6, padx=10)
-
-  # --- المحاسبة والتقارير ---
-  def open_accounting(self):
-    self.clear_window()
-    self.show_main_dashboard()
-
-    frame = tk.Frame(self.root)
-    frame.pack(fill="both", expand=True, padx=20, pady=20)
-
-    # تبويبات فرعية للمحاسبة
-    notebook = ttk.Notebook(frame)
-    notebook.pack(fill="both", expand=True)
-
-    # 1. دليل الحسابات
-    acc_frame = ttk.Frame(notebook)
-    notebook.add(acc_frame, text="دليل الحسابات")
-
-    cols = ("رقم الحساب", "اسم الحساب", "النوع")
-    acc_tree = ttk.Treeview(acc_frame, columns=cols, show="headings")
-    for col in cols:
-      acc_tree.heading(col, text=col)
-    acc_tree.pack(fill="both", expand=True, side="left")
-
-    def load_accounts():
-      for row in acc_tree.get_children():
-        acc_tree.delete(row)
-      cursor.execute("SELECT code, name, type FROM accounts")
-      for row in cursor.fetchall():
-        acc_tree.insert("", "end", values=row)
-
-    load_accounts()
-
-    add_acc_frame = tk.Frame(acc_frame)
-    add_acc_frame.pack(fill="y", side="right", padx=10)
-
-    tk.Label(add_acc_frame, text="إضافة حساب فرعي جديد", font=("Arial", 12, "bold")).pack(pady=5)
-    tk.Label(add_acc_frame, text="رقم الحساب:").pack()
-    e_acode = tk.Entry(add_acc_frame)
-    e_acode.pack()
-    tk.Label(add_acc_frame, text="اسم الحساب:").pack()
-    e_aname = tk.Entry(add_acc_frame)
-    e_aname.pack()
-    tk.Label(add_acc_frame, text="نوع الحساب (أصول/التزامات/إيرادات/مصروفات):").pack()
-    e_atype = tk.Entry(add_acc_frame)
-    e_atype.pack()
-
-    def add_sub_account():
-      try:
-        cursor.execute("INSERT INTO accounts (code, name, type) VALUES (?, ?, ?)", (e_acode.get(), e_aname.get(), e_atype.get()))
-        conn.commit()
-        load_accounts()
-        messagebox.showinfo("نجاح", "تمت إضافة الحساب بنجاح")
-      except Exception as e:
-        messagebox.showerror("خطأ", str(e))
-
-    tk.Button(add_acc_frame, text="إضافة الحساب", bg="green", fg="white", command=add_sub_account).pack(pady=10)
-
-    # 2. دفتر اليومية
-    journal_frame = ttk.Frame(notebook)
-    notebook.add(journal_frame, text="دفتر اليومية")
-
-    j_cols = ("التاريخ", "رقم القند/الحركة", "الحساب", "البيان", "مدين", "دائن")
-    j_tree = ttk.Treeview(journal_frame, columns=j_cols, show="headings")
-    for col in j_cols:
-      j_tree.heading(col, text=col)
-    j_tree.pack(fill="both", expand=True)
-
-    cursor.execute("SELECT j.date, j.entry_no, a.name, j.description, j.debit, j.credit FROM journal j JOIN accounts a ON j.account_code = a.code")
-    for row in cursor.fetchall():
-      j_tree.insert("", "end", values=row)
-
-    # 3. ميزان المراجعة
-    tb_frame = ttk.Frame(notebook)
-    notebook.add(tb_frame, text="ميزان المراجعة")
-
-    tb_cols = ("رقم الحساب", "اسم الحساب", "إجمالي المدين", "إجمالي الدائن", "الرصيد")
-    tb_tree = ttk.Treeview(tb_frame, columns=tb_cols, show="headings")
-    for col in tb_cols:
-      tb_tree.heading(col, text=col)
-    tb_tree.pack(fill="both", expand=True)
-
-    cursor.execute("SELECT a.code, a.name, SUM(j.debit), SUM(j.credit) FROM accounts a LEFT JOIN journal j ON a.code = j.account_code GROUP BY a.code")
-    for row in cursor.fetchall():
-      code, name, debit, credit = row
-      debit = debit or 0
-      credit = credit or 0
-      balance = debit - credit
-      tb_tree.insert("", "end", values=(code, name, debit, credit, balance))
-
-
-# تشغيل التطبيق
 if __name__ == "__main__":
-  root = tk.Tk()
-  app = ERPSystem(root)
-  root.mainloop()
+    main_menu()
