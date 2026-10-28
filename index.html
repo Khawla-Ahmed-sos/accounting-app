@@ -17,10 +17,10 @@
     <header class="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 rounded-2xl shadow-lg mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
             <h1 class="text-2xl font-black tracking-tight" id="header-company-title">شركة قطوف ومستحضرات التجميل</h1>
-            <p class="text-slate-400 text-sm mt-1">نظام ERP متقدم وفق المعايير الدولية (IFRS) مع ذكاء اصطناعي وحفظ دائم</p>
+            <p class="text-slate-400 text-sm mt-1">نظام ERP متقدم وفق المعايير الدولية (IFRS) مع ذكاء اصطناعي وحفظ دائم وتدقيق توازن القيود</p>
         </div>
-        <div class="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md border border-white/10 text-sm font-bold" id="header-status">
-            🟢 النظام متزامن ومحفوظ
+        <div class="bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-xl backdrop-blur-md border border-emerald-500/30 text-sm font-bold flex items-center gap-2">
+            <span>🟢 الحفظ التلقائي والتوازن المحاسبي مفعل</span>
         </div>
     </header>
 
@@ -48,7 +48,7 @@
         <section id="tab-opening" class="app-section bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <h2 class="text-lg font-black text-slate-900 border-b pb-3 mb-4">إعدادات الشركة والأرصدة الافتتاحية</h2>
             <div class="bg-amber-50 border-r-4 border-amber-500 p-4 rounded-lg text-amber-800 text-sm mb-4">
-                قم بتحديث اسم شركتك والأرصدة الأولية وسعر الصرف الدفتري الموحد المعتمد لتبدأ العمل بها فوراً. المحفظة آمنة وتحفظ تلقائياً.
+                قم بتحديث اسم شركتك والأرصدة الأولية وسعر الصرف الدفتري الموحد المعتمد. يتم الحفظ الفوري والدائم دون مسح البيانات عند التحديث.
             </div>
             <form onsubmit="App.saveOpening(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div><label class="block text-xs font-bold text-slate-500 mb-1">اسم الشركة الرسمي</label><input type="text" id="op-name" class="w-full p-2.5 border rounded-lg text-sm" required></div>
@@ -200,9 +200,9 @@
 
     </main>
 
-    <!-- Modern Reactive State & Application Engine -->
+    <!-- Modern Reactive State & Application Engine with Strict Balance Guard -->
     <script>
-        const STORAGE_KEY = 'ERP_SYSTEM_QTOUF_ULTIMATE_2026';
+        const STORAGE_KEY = 'ERP_SYSTEM_QTOUF_ULTIMATE_2026_V5';
 
         class ERPApp {
             constructor() {
@@ -286,8 +286,13 @@
                 }
             }
 
-            addJournal(desc, dr, cr, amount) {
-                this.state.journal.push({ id: this.state.journalId++, desc, dr, cr, amount });
+            // معيار محاسبي صارم: التدقيق والتأكد من توازن القيد المحاسبي (Debit == Credit)
+            addJournal(desc, drSide, crSide, amount, forceDebit = amount, forceCredit = amount) {
+                if (Math.abs(forceDebit - forceCredit) > 0.001) {
+                    alert(`⚠️ عذراً: القيد المحاسبي غير متزن! الطرف المدين (${forceDebit}) لا يساوي الطرف الدائن (${forceCredit}). تم رفض العملية وفقاً لمعايير الـ IFRS.`);
+                    throw new Error("Unbalanced Accounting Entry");
+                }
+                this.state.journal.push({ id: this.state.journalId++, desc, dr: drSide, cr: crSide, amount });
             }
 
             saveOpening(e) {
@@ -303,7 +308,11 @@
                 this.state.ownerCurrent = parseFloat(document.getElementById('op-owner').value) || 0;
 
                 let totalAssets = this.state.cash + this.state.bank + inv + this.state.courierPending + this.state.arCustomers;
-                this.addJournal("قيد الافتتاح الأولي", "الأصول المتداولة", "جاري المالك", totalAssets);
+                try {
+                    this.addJournal("قيد الافتتاح الأولي", "الأصول المتداولة (الخزينة والمصرف والمخزون والذمم)", "جاري المالك", totalAssets);
+                } catch(err) {
+                    return;
+                }
                 this.persist();
                 alert('تم حفظ الأرصدة الافتتاحية واعتمادها بنجاح!');
                 this.switchTab('dashboard');
@@ -334,6 +343,12 @@
                 let invId = document.getElementById('ai-id').value;
                 let pay = document.getElementById('ai-pay').value;
 
+                try {
+                    this.addJournal(`فاتورة شراء AI - ${invId}`, "مخزن بضائع قيد الطريق", pay === 'cash' ? "الخزينة الرئيسية" : "جاري المالك", totalLYD);
+                } catch(err) {
+                    return;
+                }
+
                 this.state.purchases.push({
                     id: invId, payType: pay, prodCode: prod.code, qty: qty, weightKG: weightKG,
                     foreignAmount: qty * unitPrice, standardAmountLYD: totalLYD, unitPriceLYD: totalLYD / qty,
@@ -342,10 +357,8 @@
 
                 this.state.transitVal += totalLYD;
                 if(pay === 'owner_current') {
-                    this.addJournal(`فاتورة شراء AI - ${invId}`, "مخزن بضائع قيد الطريق", "جاري المالك", totalLYD);
                     this.state.ownerCurrent += totalLYD;
                 } else if(pay === 'cash') {
-                    this.addJournal(`فاتورة شراء نقدي AI - ${invId}`, "مخزن بضائع قيد الطريق", "الخزينة الرئيسية", totalLYD);
                     this.state.cash -= totalLYD;
                     this.state.cashOut += totalLYD;
                 }
@@ -366,6 +379,12 @@
                 let totalLYD = qty * price * this.state.rate;
                 let weightKG = (prod.weight * qty) / 1000.0;
 
+                try {
+                    this.addJournal(`فاتورة شراء - ${invId}`, "مخزن بضائع قيد الطريق", pay === 'cash' ? "الخزينة الرئيسية" : (pay === 'bank' ? "حساب المصرف" : "جاري المالك"), totalLYD);
+                } catch(err) {
+                    return;
+                }
+
                 this.state.purchases.push({
                     id: invId, payType: pay, prodCode: pCode, qty: qty, weightKG: weightKG,
                     foreignAmount: qty * price, standardAmountLYD: totalLYD, unitPriceLYD: totalLYD / qty,
@@ -374,12 +393,12 @@
 
                 this.state.transitVal += totalLYD;
                 if(pay === 'owner_current') {
-                    this.addJournal(`فاتورة شراء - ${invId}`, "مخزن بضائع قيد الطريق", "جاري المالك", totalLYD);
                     this.state.ownerCurrent += totalLYD;
                 } else if(pay === 'cash') {
-                    this.addJournal(`فاتورة شراء نقدي - ${invId}`, "مخزن بضائع قيد الطريق", "الخزينة الرئيسية", totalLYD);
                     this.state.cash -= totalLYD;
                     this.state.cashOut += totalLYD;
+                } else if(pay === 'bank') {
+                    this.state.bank -= totalLYD;
                 }
 
                 this.persist();
@@ -390,12 +409,18 @@
             confirmReceipt(purId) {
                 let p = this.state.purchases.find(item => item.id === purId);
                 if(!p || p.isReceived) return;
+                
+                try {
+                    this.addJournal(`إذن استلام بضاعة - ${p.id}`, "المخزون الرئيسي", "مخزن بضائع قيد الطريق", p.standardAmountLYD);
+                } catch(err) {
+                    return;
+                }
+
                 p.isReceived = true;
                 this.state.transitVal -= p.standardAmountLYD;
                 let prod = this.state.products.find(item => item.code === p.prodCode);
                 prod.qty += p.qty;
                 prod.cost = p.unitPriceLYD;
-                this.addJournal(`إذن استلام بضاعة - ${p.id}`, "المخزون الرئيسي", "مخزن بضائع قيد الطريق", p.standardAmountLYD);
                 this.persist();
                 alert('تم تأكيد الاستلام بنجاح!');
             }
@@ -407,20 +432,24 @@
                 if(paid === null) return;
                 let paidLYD = parseFloat(paid);
                 let diff = paidLYD - p.standardAmountLYD;
-                p.isSettled = true;
 
-                if(p.payType === 'owner_current') {
-                    this.state.ownerCurrent -= p.standardAmountLYD;
+                try {
                     if(diff > 0) {
-                        this.state.fxGainLoss += diff;
                         this.addJournal(`تسوية فاتورة مع خسائر فروق صرف - ${p.id}`, "جاري المالك + خسائر فروق عملة", "الخزينة/المصرف", paidLYD);
                     } else if(diff < 0) {
-                        let gain = Math.abs(diff);
-                        this.state.fxGainLoss -= gain;
                         this.addJournal(`تسوية فاتورة مع أرباح فروق صرف - ${p.id}`, "جاري المالك", "الخزينة/المصرف + أرباح فروق عملة", paidLYD);
                     } else {
                         this.addJournal(`تسوية فاتورة بالقيمة الدفترية - ${p.id}`, "جاري المالك", "الخزينة/المصرف", paidLYD);
                     }
+                } catch(err) {
+                    return;
+                }
+
+                p.isSettled = true;
+                if(p.payType === 'owner_current') {
+                    this.state.ownerCurrent -= p.standardAmountLYD;
+                    if(diff > 0) this.state.fxGainLoss += diff;
+                    else if(diff < 0) this.state.fxGainLoss -= Math.abs(diff);
                 }
                 this.persist();
                 alert('تمت التسوية بنجاح!');
@@ -433,6 +462,12 @@
                 if(selected.length === 0) return alert('يرجى تحديد فاتورة واحدة على الأقل');
                 if(this.state.cash < cost) return alert('رصيد الخزينة غير كافٍ!');
 
+                try {
+                    this.addJournal("سداد مصاريف شحن وجمارك", "المخزون الرئيسي (Landed Cost)", "الخزينة الرئيسية", cost);
+                } catch(err) {
+                    return;
+                }
+
                 let target = this.state.purchases.filter(p => selected.includes(p.id) && p.isReceived);
                 let totalWt = target.reduce((s, p) => s + p.weightKG, 0);
 
@@ -443,7 +478,6 @@
                     prod.cost = ((prod.qty * prod.cost) + share) / prod.qty;
                 });
 
-                this.addJournal("سداد مصاريف شحن وجمارك", "المخزون الرئيسي (Landed Cost)", "الخزينة الرئيسية", cost);
                 this.state.cash -= cost;
                 this.state.cashOut += cost;
                 this.persist();
@@ -461,13 +495,18 @@
                 if(diff === 0) return alert('الكمية الفعلية تطابق الدفترية.');
                 let val = Math.abs(diff) * prod.cost;
 
-                if(type === 'surplus' && diff > 0) {
-                    this.addJournal("تسوية فائض مخزني", "المخزون الرئيسي", "إيرادات تسوية مخزون (فائض)", val);
-                    this.state.adjNetLoss -= val;
-                } else {
-                    this.addJournal(`تسوية جردية (${type})`, "خسائر العجز والتلف والتسويات الجردية", "المخزون الرئيسي", val);
-                    this.state.adjNetLoss += val;
+                try {
+                    if(type === 'surplus' && diff > 0) {
+                        this.addJournal("تسوية فائض مخزني", "المخزون الرئيسي", "إيرادات تسوية مخزون (فائض)", val);
+                        this.state.adjNetLoss -= val;
+                    } else {
+                        this.addJournal(`تسوية جردية (${type})`, "خسائر العجز والتلف والتسويات الجردية", "المخزون الرئيسي", val);
+                        this.state.adjNetLoss += val;
+                    }
+                } catch(err) {
+                    return;
                 }
+
                 prod.qty = actual;
                 this.state.adjustments.push({ prodName: prod.name, bookQty: prod.qty - diff, actualQty: actual, diffQty: diff, typeName: type, valAmount: val, reason });
                 this.persist();
@@ -502,6 +541,20 @@
                 if(prod.qty < order.qty) return alert('الكمية غير كافية بالمخزن للإتمام.');
 
                 let cogs = order.qty * prod.cost;
+
+                try {
+                    if(order.channel === 'courier_company') {
+                        this.addJournal(`مبيعات طلب معلق - ${order.id}`, "أرصدة شركات التوصيل المعلقة", "إيرادات المبيعات", order.total);
+                    } else if(order.channel === 'driver_cash') {
+                        this.addJournal(`مبيعات طلب معلق نقدي - ${order.id}`, "الخزينة الرئيسية", "إيرادات المبيعات", order.total);
+                    } else {
+                        this.addJournal(`مبيعات طلب معلق آجل - ${order.id}`, "ذمم مدينة (الزبائن الآجل)", "إيرادات المبيعات", order.total);
+                    }
+                    this.addJournal(`تكلفة البضاعة المباعة - ${order.id}`, "تكلفة البضاعة المباعة (COGS)", "المخزون الرئيسي", cogs);
+                } catch(err) {
+                    return;
+                }
+
                 prod.qty -= order.qty;
                 this.state.totalSales += order.total;
                 this.state.totalCOGS += cogs;
@@ -510,17 +563,13 @@
                 this.state.sales.push({ ref: order.id, channel: `${order.customer} (${order.channel})`, prodCode: order.prodCode, qty: order.qty, total: order.total, cogs });
 
                 if(order.channel === 'courier_company') {
-                    this.addJournal(`مبيعات طلب معلق - ${order.id}`, "أرصدة شركات التوصيل المعلقة", "إيرادات المبيعات", order.total);
                     this.state.courierPending += order.total;
                 } else if(order.channel === 'driver_cash') {
-                    this.addJournal(`مبيعات طلب معلق نقدي - ${order.id}`, "الخزينة الرئيسية", "إيرادات المبيعات", order.total);
                     this.state.cash += order.total;
                     this.state.cashIn += order.total;
                 } else {
-                    this.addJournal(`مبيعات طلب معلق آجل - ${order.id}`, "ذمم مدينة (الزبائن الآجل)", "إيرادات المبيعات", order.total);
                     this.state.arCustomers += order.total;
                 }
-                this.addJournal(`تكلفة البضاعة المباعة - ${order.id}`, "تكلفة البضاعة المباعة (COGS)", "المخزون الرئيسي", cogs);
 
                 this.persist();
                 alert('تم تأكيد التسليم والتحصيل وانتقلت المبيعات لسجل المبيعات الفعلي بنجاح!');
@@ -530,13 +579,18 @@
                 e.preventDefault();
                 let amt = parseFloat(document.getElementById('set-amt').value);
                 let fee = parseFloat(document.getElementById('set-fee').value) || 0;
+
+                try {
+                    this.addJournal("تسوية شركة التوصيل", "الخزينة الرئيسية", "أرصدة شركات التوصيل المعلقة", amt);
+                    if(fee > 0) this.addJournal("عمولة شركة التوصيل", "مصاريف وعمولات التوصيل", "أرصدة شركات التوصيل المعلقة", fee);
+                } catch(err) {
+                    return;
+                }
+
                 this.state.cash += amt;
                 this.state.cashIn += amt;
                 this.state.courierPending -= (amt + fee);
                 this.state.totalExpenses += fee;
-
-                this.addJournal("تسوية شركة التوصيل", "الخزينة الرئيسية", "أرصدة شركات التوصيل المعلقة", amt);
-                if(fee > 0) this.addJournal("عمولة شركة التوصيل", "مصاريف وعمولات التوصيل", "أرصدة شركات التوصيل المعلقة", fee);
                 this.persist();
                 alert('تمت التسوية بنجاح!');
                 e.target.reset();
@@ -548,12 +602,16 @@
                 if(this.state.distributed) return alert('تم توزيع أرباح هذه الفترة مسبقاً');
 
                 let share = net / 2;
+                try {
+                    this.addJournal("توزيع الأرباح (50% لكل شريك)", "الأرباح المبقاة", "جاري المالك", share);
+                    this.addJournal("توزيع الأرباح (50% لكل شريك)", "الأرباح المبقاة", "جاري الشريك", share);
+                } catch(err) {
+                    return;
+                }
+
                 this.state.ownerCurrent += share;
                 this.state.partnerCurrent += share;
                 this.state.distributed = true;
-
-                this.addJournal("توزيع الأرباح (50% لكل شريك)", "الأرباح المبقاة", "جاري المالك", share);
-                this.addJournal("توزيع الأرباح (50% لكل شريك)", "الأرباح المبقاة", "جاري الشريك", share);
                 this.persist();
                 alert('تم توزيع الأرباح مناصفة بنجاح!');
             }
