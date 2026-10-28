@@ -3,42 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام ERP المحاسبي - شركة المكياج</title>
+    <title>نظام ERP المحاسبي الشامل - إدارة شركات التجميل والمكياج</title>
     <style>
         :root {
-            --primary: #8e24aa;
-            --primary-dark: #6a1b9a;
-            --secondary: #00897b;
-            --bg: #f4f6f9;
+            --primary: #4a154b;
+            --primary-light: #611f69;
+            --accent: #007a5a;
+            --accent-hover: #148567;
+            --bg: #f8f9fa;
             --card-bg: #ffffff;
-            --text: #333333;
-            --border: #e0e0e0;
+            --text-main: #1d1c1d;
+            --text-muted: #616061;
+            --border: #dddddd;
+            --danger: #e01e5a;
+            --warning: #ecb22e;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
-        body { background-color: var(--bg); color: var(--text); padding: 20px; }
-        header { background: var(--primary-dark); color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-        nav { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-        nav button { padding: 10px 18px; border: none; background: var(--card-bg); border-radius: 6px; cursor: pointer; font-weight: bold; color: var(--text); border: 1px solid var(--border); transition: 0.2s; }
-        nav button.active, nav button:hover { background: var(--primary); color: white; border-color: var(--primary-dark); }
-        .section { display: none; background: var(--card-bg); padding: 25px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .section.active { display: block; }
-        h2 { color: var(--primary-dark); margin-bottom: 15px; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
-        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 15px; }
-        .form-group { display: flex; flex-direction: column; gap: 5px; }
-        label { font-size: 0.9em; font-weight: bold; }
-        input, select, button { padding: 9px; border: 1px solid var(--border); border-radius: 5px; outline: none; }
-        .btn-submit { background: var(--secondary); color: white; border: none; font-weight: bold; cursor: pointer; padding: 12px; margin-top: 10px; }
-        .btn-submit:hover { opacity: 0.9; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9em; }
-        th, td { border: 1px solid var(--border); padding: 10px; text-align: center; }
-        th { background: #f0f0f0; color: #444; }
-        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .card { background: #fff; padding: 15px; border-radius: 8px; border-right: 4px solid var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .card h4 { font-size: 0.85em; color: #666; }
-        .card p { font-size: 1.4em; font-weight: bold; color: var(--primary-dark); margin-top: 5px; }
-        .badge { padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; }
-        .badge-import { background: #e3f2fd; color: #1565c0; }
-        .badge-local { background: #e8f5e9; color: #2e7d32; }
+        body { background-color: var(--bg); color: var(--text-main); padding: 20px; line-height: 1.5; }
+        
+        header { 
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); 
+            color: white; padding: 24px 30px; border-radius: 12px; margin-bottom: 24px; 
+            box-shadow: var(--shadow); display: flex; justify-content: space-between; align-items: center; 
+        }
+        header h1 { font-size: 1.8rem; font-weight: 700; }
+        header p { font-size: 0.95rem; opacity: 0.9; margin-top: 4px; }
+
+        nav { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; background: #eee; padding: 6px; border-radius: 10px; }
+        nav button { 
+            padding: 10px 18px; border: none; background: transparent; border-radius: 8px; 
+            cursor: pointer; font-weight: 600; color: var(--text-muted); transition: all 0.2s; font-size: 0.9rem; 
+        }
+        nav button.active { background: var(--card-bg); color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+        nav button:hover:not(.active) { color: var(--primary-light); background: rgba(255,255,255,0.5); }
+
+        .section { display: none; background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: var(--shadow); margin-bottom: 20px; }
+        .section.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+        h2 { color: var(--primary); margin-bottom: 20px; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; font-size: 1.3rem; }
+        h3 { color: var(--text-main); margin: 18px 0 12px 0; font-size: 1.1rem; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-bottom: 18px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+        input, select, button { padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; outline: none; font-size: 0.95rem; }
+        input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(74, 21, 75, 0.1); }
+
+        .btn-submit { background: var(--accent); color: white; border: none; font-weight: 600; cursor: pointer; padding: 12px; margin-top: 10px; border-radius: 6px; transition: 0.2s; }
+        .btn-submit:hover { background: var(--accent-hover); }
+        .btn-danger { background: var(--danger); color: white; border: none; font-weight: 600; cursor: pointer; padding: 10px; border-radius: 6px; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 0.9rem; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: center; }
+        th { background: #fdfdfd; color: var(--text-muted); font-weight: 700; }
+        tr:nth-child(even) { background-color: #fafafa; }
+
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px; margin-bottom: 24px; }
+        .card { background: #fff; padding: 20px; border-radius: 10px; border-top: 4px solid var(--primary); box-shadow: var(--shadow); }
+        .card h4 { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
+        .card p { font-size: 1.5rem; font-weight: 700; color: var(--primary); margin-top: 8px; }
+
+        .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; }
+        .badge-import { background: #e8f4fd; color: #1d70b8; }
+        .badge-local { background: #edf7ed; color: #1e4620; }
+        
+        .financial-box { background: #fff; border: 1px solid var(--border); padding: 22px; border-radius: 10px; box-shadow: var(--shadow); }
+        .flex-reports { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+        .note-box { background: #fff8e1; border-right: 4px solid var(--warning); padding: 12px 16px; border-radius: 4px; font-size: 0.88rem; margin-bottom: 15px; color: #5d4037; }
     </style>
 </head>
 <body>
@@ -46,43 +79,57 @@
     <header>
         <div>
             <h1>نظام ERP المحاسبي المتكامل</h1>
-            <p>إدارة مشتريات الاستيراد، التوصيل، الشحن بالوزن، وحقوق الشركاء</p>
+            <p>إدارة مشتريات الاستيراد والتوزيع، التكاليف بالوزن، التسويات الجردية، وحقوق الشركاء</p>
         </div>
     </header>
 
     <nav>
         <button class="active" onclick="showTab('dashboard')">لوحة التحكم</button>
-        <button onclick="showTab('products')">دليل المنتجات (الأوزان)</button>
+        <button onclick="showTab('coa')">دليل الحسابات</button>
+        <button onclick="showTab('products')">دليل المنتجات</button>
         <button onclick="showTab('purchases')">فواتير الشراء</button>
         <button onclick="showTab('shipping')">توزيع الشحن والجمارك</button>
+        <button onclick="showTab('stock_adj')">التسويات الجردية</button>
         <button onclick="showTab('sales')">المبيعات والتوصيل</button>
         <button onclick="showTab('journal')">دفتر اليومية الآلي</button>
-        <button onclick="showTab('reports')">القوائم المالية والتقارير</button>
+        <button onclick="showTab('reports')">القوائم والتقارير المالية</button>
     </nav>
 
     <!-- Dashboard -->
     <div id="dashboard" class="section active">
-        <h2>ملخص المركز المالي</h2>
+        <h2>ملخص المركز المالي والعمليات</h2>
         <div class="cards">
             <div class="card"><h4>الخزينة الرئيسية (نقدياً)</h4><p id="dash-cash">0 د.ل</p></div>
             <div class="card"><h4>قيمة المخزون (بالتكلفة)</h4><p id="dash-inventory">0 د.ل</p></div>
             <div class="card"><h4>معلقات شركات التوصيل</h4><p id="dash-courier">0 د.ل</p></div>
             <div class="card"><h4>جاري المالك (حقوق ملكية)</h4><p id="dash-owner">0 د.ل</p></div>
-            <div class="card"><h4>جاري الشريك - صاحب الفكرة (حقوق ملكية)</h4><p id="dash-partner">0 د.ل</p></div>
+            <div class="card"><h4>جاري الشريك (صاحب الفكرة)</h4><p id="dash-partner">0 د.ل</p></div>
         </div>
+    </div>
+
+    <!-- Chart of Accounts -->
+    <div id="coa" class="section">
+        <h2>دليل الحسابات (Chart of Accounts)</h2>
+        <div class="note-box">شجرة دليل الحسابات الرسمية المعتمدة في نظام الـ ERP مصنفة وفق معايير IFRS.</div>
+        <table>
+            <thead>
+                <tr><th>رمز الحساب</th><th>اسم الحساب</th><th>النوع / التبويب الرئيس</th><th>طبيعة الحساب</th><th>الرصيد الحالي (د.ل)</th></tr>
+            </thead>
+            <tbody id="coa-list"></tbody>
+        </table>
     </div>
 
     <!-- Products -->
     <div id="products" class="section">
-        <h2>تعريف المنتجات والأوزان</h2>
+        <h2>دليل تعريف المنتجات والأوزان</h2>
         <form onsubmit="addProduct(event)">
             <div class="form-grid">
-                <div class="form-group"><label>كود المنتج</label><input type="text" id="p-code" required></div>
-                <div class="form-group"><label>اسم الصنف</label><input type="text" id="p-name" required></div>
-                <div class="form-group"><label>الوزن الصافي للقطعة (جرام)</label><input type="number" id="p-weight" step="0.1" required></div>
+                <div class="form-group"><label>كود المنتج</label><input type="text" id="p-code" required placeholder="مثال: MK-01"></div>
+                <div class="form-group"><label>اسم الصنف</label><input type="text" id="p-name" required placeholder="اسم منتج المكياج"></div>
+                <div class="form-group"><label>وزن القطعة الواحدة (جرام)</label><input type="number" id="p-weight" step="0.1" required placeholder="يستخدم لتوزيع الشحن"></div>
                 <div class="form-group"><label>سعر البيع القطاعي (د.ل)</label><input type="number" id="p-price" step="0.1" required></div>
             </div>
-            <button class="btn-submit" type="submit">إضافة المنتج</button>
+            <button class="btn-submit" type="submit">إضافة المنتج إلى الدليل</button>
         </form>
 
         <table>
@@ -123,23 +170,45 @@
         </table>
     </div>
 
-    <!-- Shipping -->
+    <!-- Shipping Allocation -->
     <div id="shipping" class="section">
-        <h2>توزيع مصاريف الشحن والجمارك بالوزن</h2>
-        <p style="margin-bottom:15px; color:#666; font-size:0.9em;">يتم دفع المصاريف فوراً من خزينة الشركة وتوزيعها آلياً على الفواتير المحددة حسب أوزان الأصناف.</p>
+        <h2>توزيع مصاريف الشحن والجمارك بالوزن على الفواتير</h2>
+        <div class="note-box">تدفع مصاريف الشحن فوراً من خزينة الشركة، ويقوم النظام بتوزيع قيمتها آلياً على الفواتير المختارة بناءً على الوزن الإجمالي للأصناف المخزنة.</div>
         <form onsubmit="processShipping(event)">
             <div class="form-grid">
-                <div class="form-group"><label>إجمالي مصاريف الشحن والجمارك (د.ل)</label><input type="number" id="ship-cost" step="0.1" required></div>
+                <div class="form-group"><label>إجمالي مصاريف الشحن والجمارك المدفوعة (د.ل)</label><input type="number" id="ship-cost" step="0.1" required></div>
             </div>
-            <label>اختر الفواتير المشمولة في الشحنة:</label>
-            <div id="shipping-invoices-list" style="margin: 10px 0;"></div>
-            <button class="btn-submit" type="submit">توزيع الشحن على التكلفة وتوليد القيد</button>
+            <label style="font-weight:bold; display:block; margin-bottom:8px;">اختر الفواتير المشمولة في هذه الشحنة:</label>
+            <div id="shipping-invoices-list" style="margin: 10px 0; background:#fafafa; padding:12px; border-radius:6px; border:1px solid var(--border);"></div>
+            <button class="btn-submit" type="submit">توزيع الشحن على التكلفة وتوليد القيود</button>
         </form>
+    </div>
+
+    <!-- Stock Adjustment -->
+    <div id="stock_adj" class="section">
+        <h2>التسويات الجردية للمخزون (Stock Adjustments)</h2>
+        <div class="note-box">تستخدم هذه الشاشة لمطابقة الجرد الفعلي مع الرصيد الدفتري، ويتم معالجة العجز أو الفائض بقيد محاسبي آلي.</div>
+        <form onsubmit="processStockAdjustment(event)">
+            <div class="form-grid">
+                <div class="form-group"><label>المنتج المجرود</label><select id="adj-prod"></select></div>
+                <div class="form-group"><label>الكمية المجرودة فعلياً بالمخزن</label><input type="number" id="adj-actual-qty" required></div>
+                <div class="form-group"><label>سبب التسوية / ملاحظات</label><input type="text" id="adj-reason" placeholder="مثال: تلف، عجز جرد، زيادة غير مسجلة" required></div>
+            </div>
+            <button class="btn-submit" type="submit">إثبات التسوية الجردية آلياً</button>
+        </form>
+
+        <h3>سجل تسويات الجرد المنجزة</h3>
+        <table>
+            <thead>
+                <tr><th>المنتج</th><th>الكمية الدفترية</th><th>الكمية الفعلية</th><th>الفارق</th><th>طبيعة التسوية</th><th>السبب</th></tr>
+            </thead>
+            <tbody id="adj-list"></tbody>
+        </table>
     </div>
 
     <!-- Sales -->
     <div id="sales" class="section">
-        <h2>سجل المبيعات والتوصيل</h2>
+        <h2>سجل المبيعات وتسويات التوصيل</h2>
         <form onsubmit="addSale(event)">
             <div class="form-grid">
                 <div class="form-group"><label>نوع البيع</label>
@@ -150,15 +219,15 @@
                     </select>
                 </div>
                 <div class="form-group"><label>المنتج</label><select id="sale-prod"></select></div>
-                <div class="form-group"><label>الكمية</label><input type="number" id="sale-qty" required></div>
+                <div class="form-group"><label>الكمية المباعة</label><input type="number" id="sale-qty" required></div>
                 <div class="form-group"><label>سعر البيع للقطعة (د.ل)</label><input type="number" id="sale-price" step="0.1" required></div>
             </div>
             <button class="btn-submit" type="submit">إتمام البيع واستخراج التكلفة آلياً</button>
         </form>
 
-        <h3 style="margin-top:20px;">تسوية مبيعات شركات التوصيل</h3>
+        <h3>تسوية حسابات معلقات شركات التوصيل</h3>
         <div class="form-grid" style="margin-top:10px;">
-            <div class="form-group"><label>المبلغ المحصل من شركة التوصيل</label><input type="number" id="settle-amount" step="0.1"></div>
+            <div class="form-group"><label>المبلغ المحصل نقداً من شركة التوصيل</label><input type="number" id="settle-amount" step="0.1"></div>
             <div class="form-group"><label>عمولة التوصيل المخصومة</label><input type="number" id="settle-fee" step="0.1"></div>
             <div class="form-group"><button class="btn-submit" onclick="settleCourier()" style="margin-top:22px;">إثبات تسوية التوصيل</button></div>
         </div>
@@ -166,7 +235,7 @@
 
     <!-- Journal Entries -->
     <div id="journal" class="section">
-        <h2>دفتر اليومية العامة الآلي (Automated Journal)</h2>
+        <h2>دفتر اليومية العامة الآلي (Automated General Journal)</h2>
         <table>
             <thead>
                 <tr><th>رقم القيد</th><th>البيان / الشرح</th><th>حساب المدين (Debit)</th><th>حساب الدائن (Credit)</th><th>المبلغ (د.ل)</th></tr>
@@ -175,25 +244,68 @@
         </table>
     </div>
 
-    <!-- Reports -->
+    <!-- Financial Reports -->
     <div id="reports" class="section">
-        <h2>القوائم المالية وتوزيع الأرباح</h2>
-        <div style="display:flex; gap:20px; flex-wrap: wrap;">
-            <div style="flex:1; min-width: 280px; background:#f9f9f9; padding:15px; border-radius:8px;">
-                <h3>قائمة الدخل (Income Statement)</h3>
+        <h2>القوائم المالية والتقارير المجمعة (IFRS Reports)</h2>
+        
+        <div style="margin-bottom:20px;">
+            <button class="btn-submit" style="background:var(--primary);" onclick="distributeProfits()">ترحيل وإقفال الأرباح مناصفة (50% / 50%)</button>
+        </div>
+
+        <div class="flex-reports">
+            <!-- Income Statement -->
+            <div class="financial-box">
+                <h3>1. قائمة الدخل (Income Statement)</h3>
                 <hr style="margin:10px 0;">
-                <p>إجمالي المبيعات: <b id="rep-sales">0</b> د.ل</p>
-                <p>تكلفة البضاعة المباعة (COGS): <b id="rep-cogs">0</b> د.ل</p>
-                <p>مصاريف وعمولات التوصيل: <b id="rep-exp">0</b> د.ل</p>
+                <p>إجمالي إيرادات المبيعات: <b id="rep-sales">0</b> د.ل</p>
+                <p>يخصم: تكلفة البضاعة المباعة (COGS): <b id="rep-cogs">0</b> د.ل</p>
+                <hr style="margin:5px 0;">
+                <p><b>مجمل الربح المخزني: <span id="rep-gross">0</span> د.ل</b></p>
+                <p>يخصم: عمولات وتكاليف التوصيل: <b id="rep-exp">0</b> د.ل</p>
+                <p>يخصم/يضاف: تسويات وتلفيات الجرد: <b id="rep-adj-exp">0</b> د.ل</p>
                 <hr style="margin:10px 0;">
-                <h4>صافي الربح القابل للتوزيع: <span id="rep-netprofit">0</span> د.ل</h4>
+                <h4>صافي الربح / الخسارة: <span id="rep-netprofit" style="color:var(--primary);">0</span> د.ل</h4>
             </div>
-            <div style="flex:1; min-width: 280px; background:#f9f9f9; padding:15px; border-radius:8px;">
-                <h3>توزيع أرباح الشركاء (50% / 50%)</h3>
+
+            <!-- Balance Sheet -->
+            <div class="financial-box">
+                <h3>2. الميزانية العمومية (Balance Sheet)</h3>
                 <hr style="margin:10px 0;">
-                <p>حصة المالك الممول: <b id="rep-owner-share">0</b> د.ل</p>
-                <p>حصة الشريك (صاحب الفكرة): <b id="rep-partner-share">0</b> د.ل</p>
-                <button class="btn-submit" onclick="distributeProfits()">ترحيل الأرباح لحسابات جاري الشركاء</button>
+                <h4 style="color:var(--primary);">الأصول (Assets)</h4>
+                <p>الخزينة الرئيسية (النقدية): <b id="bs-cash">0</b> د.ل</p>
+                <p>المخزون السلعي (بالتكلفة): <b id="bs-inventory">0</b> د.ل</p>
+                <p>معلقات شركات التوصيل: <b id="bs-courier">0</b> د.ل</p>
+                <p>الذمم المدينة (الزبائن - الآجل): <b id="bs-ar">0</b> د.ل</p>
+                <p><b>إجمالي الأصول: <span id="bs-total-assets">0</span> د.ل</b></p>
+                <hr style="margin:10px 0;">
+                <h4 style="color:var(--primary);">الالتزامات وحقوق الملكية</h4>
+                <p>الالتزامات (الموردون المحليون): <b id="bs-ap">0</b> د.ل</p>
+                <p>جاري المالك (تمويل وحقوق ملكية): <b id="bs-owner">0</b> د.ل</p>
+                <p>جاري الشريك (صاحب الفكرة - حقوق): <b id="bs-partner">0</b> د.ل</p>
+                <p>الأرباح غير الموزعة: <b id="bs-retained">0</b> د.ل</p>
+                <p><b>إجمالي الالتزامات وحقوق الملكية: <span id="bs-total-liab-equity">0</span> د.ل</b></p>
+            </div>
+
+            <!-- Equity Statement -->
+            <div class="financial-box">
+                <h3>3. قائمة التغيرات في حقوق الملكية</h3>
+                <hr style="margin:10px 0;">
+                <p>حساب جاري المالك (رأس المال والتمويل): <b id="eq-owner">0</b> د.ل</p>
+                <p>حساب جاري الشريك (صاحب الفكرة): <b id="eq-partner">0</b> د.ل</p>
+                <p>الأرباح الموزعة خلال الدورة: <b id="eq-distributed">0</b> د.ل</p>
+                <hr style="margin:10px 0;">
+                <h4>إجمالي حقوق الملكية: <span id="eq-total">0</span> د.ل</h4>
+            </div>
+
+            <!-- Cash Flow Statement -->
+            <div class="financial-box">
+                <h3>4. قائمة التدفقات النقدية (Cash Flow)</h3>
+                <hr style="margin:10px 0;">
+                <p>الرصيد النقدي الافتتاحي: <b>5,000.00</b> د.ل</p>
+                <p>النقود المحصلة من المبيعات والتسويات: <b id="cf-in">0</b> د.ل</p>
+                <p>النقود المدفوعة للمشتريات والشحن: <b id="cf-out">0</b> د.ل</p>
+                <hr style="margin:10px 0;">
+                <h4>صافي الرصيد النقدي بالخزينة: <span id="cf-net">0</span> د.ل</h4>
             </div>
         </div>
     </div>
@@ -204,12 +316,34 @@
             products: [],
             purchases: [],
             journal: [],
+            stockAdjustments: [],
+            accounts: [
+                { code: "1111", name: "الخزينة الرئيسية", type: "أصول متداولة", nature: "مدين", balance: 5000 },
+                { code: "1112", name: "أرصدة شركات التوصيل المعلقة", type: "أصول متداولة", nature: "مدين", balance: 0 },
+                { code: "1120", name: "ذمم مدينة (الزبائن - آجل)", type: "أصول متداولة", nature: "مدين", balance: 0 },
+                { code: "1130", name: "المخزون الرئيسي", type: "أصول متداولة", nature: "مدين", balance: 0 },
+                { code: "2110", name: "الموردون المحليون (ذمم دائنة)", type: "التزامات متداولة", nature: "دائن", balance: 0 },
+                { code: "3110", name: "جاري المالك (تمويل وحقوق ملكية)", type: "حقوق الملكية", nature: "دائن", balance: 0 },
+                { code: "3120", name: "جاري الشريك (صاحب الفكرة)", type: "حقوق الملكية", nature: "دائن", balance: 0 },
+                { code: "3200", name: "الأرباح المبقاة", type: "حقوق الملكية", nature: "دائن", balance: 0 },
+                { code: "4100", name: "إيرادات المبيعات", type: "إيرادات", nature: "دائن", balance: 0 },
+                { code: "4200", name: "إيرادات تسوية مخزون (فائض)", type: "إيرادات", nature: "دائن", balance: 0 },
+                { code: "5100", name: "تكلفة البضاعة المباعة (COGS)", type: "تكاليف", nature: "مدين", balance: 0 },
+                { code: "5200", name: "مصاريف وعمولات التوصيل", type: "مصاريف", nature: "مدين", balance: 0 },
+                { code: "5300", name: "مصاريف عجز وتلف مخزون", type: "مصاريف", nature: "مدين", balance: 0 }
+            ],
             courierPending: 0,
+            arCustomers: 0,
+            apSuppliers: 0,
             ownerCurrent: 0,
             partnerCurrent: 0,
             totalSales: 0,
             totalCOGS: 0,
             totalExpenses: 0,
+            stockAdjNetExpense: 0,
+            cashInflows: 0,
+            cashOutflows: 0,
+            isProfitsDistributed: false,
             journalId: 101
         };
 
@@ -236,7 +370,11 @@
                 qty: 0,
                 cost: 0
             });
-            alert('تم إضافة المنتج وتحديد وزنه الفردي بنجاح!');
+            alert('تم إضافة المنتج وتحديد وزنه الصافي بنجاح!');
+            document.getElementById('p-code').value = '';
+            document.getElementById('p-name').value = '';
+            document.getElementById('p-weight').value = '';
+            document.getElementById('p-price').value = '';
             updateUI();
         }
 
@@ -244,6 +382,8 @@
             e.preventDefault();
             let pCode = document.getElementById('pur-prod').value;
             let product = db.products.find(p => p.code === pCode);
+            if(!product) return alert('يرجى تحديد منتج من القائمة');
+
             let qty = parseInt(document.getElementById('pur-qty').value);
             let unitPrice = parseFloat(document.getElementById('pur-price').value);
             let type = document.getElementById('pur-type').value;
@@ -267,15 +407,20 @@
             db.purchases.push(purchase);
 
             if(type === 'import') {
-                addJournal("فاتورة شراء استيراد - " + purchase.id, "المخزون - بضائع في الطريق", "جاري المالك (حقوق ملكية)", totalAmountLYD);
+                addJournal("فاتورة شراء استيراد - " + purchase.id, "المخزون الرئيسي", "جاري المالك (تمويل وحقوق ملكية)", totalAmountLYD);
                 db.ownerCurrent += totalAmountLYD;
+                product.qty += qty;
+                product.cost = totalAmountLYD / qty;
             } else if(type === 'local_cash') {
+                if(db.cash < totalAmountLYD) return alert('الرصيد النقدي بالخزينة غير كافٍ');
                 addJournal("فاتورة شراء محلي نقدي - " + purchase.id, "المخزون الرئيسي", "الخزينة الرئيسية", totalAmountLYD);
                 db.cash -= totalAmountLYD;
+                db.cashOutflows += totalAmountLYD;
                 product.qty += qty;
                 product.cost = totalAmountLYD / qty;
             } else {
-                addJournal("فاتورة شراء محلي آجل - " + purchase.id, "المخزون الرئيسي", "الموردين المحليين (ذمم دائنة)", totalAmountLYD);
+                addJournal("فاتورة شراء محلي آجل - " + purchase.id, "المخزون الرئيسي", "الموردون المحليون (ذمم دائنة)", totalAmountLYD);
+                db.apSuppliers += totalAmountLYD;
                 product.qty += qty;
                 product.cost = totalAmountLYD / qty;
             }
@@ -301,15 +446,56 @@
                 p.isShipped = true;
 
                 let prod = db.products.find(item => item.code === p.prodCode);
-                let landedCostTotal = p.amountLYD + share;
-                prod.qty += p.qty;
-                prod.cost = landedCostTotal / p.qty;
+                let currentTotalVal = (prod.qty * prod.cost) + share;
+                prod.cost = currentTotalVal / prod.qty;
             });
 
-            addJournal("مصاريف شحن وجمارك سداد فوري", "المخزون الرئيسي (Landed Cost)", "الخزينة الرئيسية", totalFreightCost);
+            addJournal("مصاريف شحن وجمارك سداد فوري من الشركة", "المخزون الرئيسي (Landed Cost)", "الخزينة الرئيسية", totalFreightCost);
             db.cash -= totalFreightCost;
+            db.cashOutflows += totalFreightCost;
 
             alert('تم توزيع مصاريف الشحن بنسبة الأوزان وتعديل تكلفة المخزون!');
+            updateUI();
+        }
+
+        function processStockAdjustment(e) {
+            e.preventDefault();
+            let pCode = document.getElementById('adj-prod').value;
+            let prod = db.products.find(p => p.code === pCode);
+            if(!prod) return alert('اختر المنتج أولاً');
+
+            let actualQty = parseInt(document.getElementById('adj-actual-qty').value);
+            let reason = document.getElementById('adj-reason').value;
+            let bookQty = prod.qty;
+            let diffQty = actualQty - bookQty;
+
+            if(diffQty === 0) return alert('الكمية المجرودة تطابق الكمية الدفترية بالفعل.');
+
+            let valAmount = Math.abs(diffQty) * prod.cost;
+
+            if(diffQty < 0) {
+                // Shortage
+                addJournal("تسوية جردية (عجز/تلف مخزون) - " + prod.name, "مصاريف عجز وتلف مخزون", "المخزون الرئيسي", valAmount);
+                db.stockAdjNetExpense += valAmount;
+            } else {
+                // Surplus
+                addJournal("تسوية جردية (فائض مخزون) - " + prod.name, "المخزون الرئيسي", "إيرادات تسوية مخزون (فائض)", valAmount);
+                db.stockAdjNetExpense -= valAmount;
+            }
+
+            prod.qty = actualQty;
+
+            db.stockAdjustments.push({
+                prodName: prod.name,
+                bookQty: bookQty,
+                actualQty: actualQty,
+                diffQty: diffQty,
+                valAmount: valAmount,
+                type: diffQty < 0 ? 'عجز' : 'فائض',
+                reason: reason
+            });
+
+            alert('تم تسجيل التسوية الجردية وتعديل المخزون والقوائم بنجاح!');
             updateUI();
         }
 
@@ -317,6 +503,8 @@
             e.preventDefault();
             let pCode = document.getElementById('sale-prod').value;
             let prod = db.products.find(p => p.code === pCode);
+            if(!prod) return alert('يرجى تحديد المنتج');
+
             let qty = parseInt(document.getElementById('sale-qty').value);
             let price = parseFloat(document.getElementById('sale-price').value);
             let type = document.getElementById('sale-type').value;
@@ -331,13 +519,15 @@
             db.totalCOGS += cogs;
 
             if(type === 'courier_company') {
-                addJournal("مبيعات قطاعي - شركة توصيل", "أرصدة شركات توصيل معلقة", "إيراد المبيعات", totalSale);
+                addJournal("مبيعات قطاعي - شركة توصيل", "أرصدة شركات توصيل المعلقة", "إيرادات المبيعات", totalSale);
                 db.courierPending += totalSale;
             } else if(type === 'driver_cash') {
-                addJournal("مبيعات قطاعي - تسليم نفس اليوم", "الخزينة الرئيسية", "إيراد المبيعات", totalSale);
+                addJournal("مبيعات قطاعي - تسليم نفس اليوم", "الخزينة الرئيسية", "إيرادات المبيعات", totalSale);
                 db.cash += totalSale;
+                db.cashInflows += totalSale;
             } else {
-                addJournal("مبيعات جملة - آجل", "ذمم مدينة (الزبائن)", "إيراد المبيعات", totalSale);
+                addJournal("مبيعات جملة - آجل", "ذمم مدينة (الزبائن - آجل)", "إيرادات المبيعات", totalSale);
+                db.arCustomers += totalSale;
             }
 
             addJournal("إثبات تكلفة البضاعة المباعة", "تكلفة البضاعة المباعة (COGS)", "المخزون الرئيسي", cogs);
@@ -352,11 +542,12 @@
             
             let totalSettled = amount + fee;
             db.cash += amount;
+            db.cashInflows += amount;
             db.courierPending -= totalSettled;
             db.totalExpenses += fee;
 
-            addJournal("تسوية حساب شركة التوصيل", "الخزينة (صافي التحصيل)", "أرصدة شركات توصيل معلقة", amount);
-            if(fee > 0) addJournal("خصم عمولة التوصيل", "مصاريف وعمولات توصيل", "أرصدة شركات توصيل معلقة", fee);
+            addJournal("تسوية حساب شركة التوصيل", "الخزينة الرئيسية", "أرصدة شركات توصيل المعلقة", amount);
+            if(fee > 0) addJournal("خصم عمولة التوصيل", "مصاريف وعمولات التوصيل", "أرصدة شركات توصيل المعلقة", fee);
 
             alert('تم إثبات تسوية التوصيل بنجاح!');
             updateUI();
@@ -373,36 +564,66 @@
         }
 
         function distributeProfits() {
-            let netProfit = db.totalSales - db.totalCOGS - db.totalExpenses;
-            if(netProfit <= 0) return alert('لا توجد أرباح قابلة للتوزيع حالياً');
+            let netProfit = db.totalSales - db.totalCOGS - db.totalExpenses - db.stockAdjNetExpense;
+            if(netProfit <= 0) return alert('لا توجد أرباح صافية قابلة للتوزيع حالياً');
+            if(db.isProfitsDistributed) return alert('تم توزيع أرباح هذه الدورة سابقاً');
 
             let share = netProfit / 2;
             db.ownerCurrent += share;
             db.partnerCurrent += share;
+            db.isProfitsDistributed = true;
 
-            addJournal("إقفال وتوزيع صافي الأرباح", "ملخص الدخل", "جاري المالك (حقوق ملكية)", share);
-            addJournal("إقفال وتوزيع صافي الأرباح", "ملخص الدخل", "جاري الشريك - صاحب الفكرة (حقوق ملكية)", share);
+            addJournal("إقفال وتوزيع صافي الأرباح (50%)", "الأرباح المبقاة / ملخص الدخل", "جاري المالك (تمويل وحقوق ملكية)", share);
+            addJournal("إقفال وتوزيع صافي الأرباح (50%)", "الأرباح المبقاة / ملخص الدخل", "جاري الشريك (صاحب الفكرة)", share);
 
-            alert('تم ترحيل الأرباح بنسبة 50% لكل شريك في حقوق الملكية!');
+            alert('تم ترحيل الأرباح بنسبة 50% لكل شريك إلى حقوق الملكية!');
             updateUI();
         }
 
         function updateUI() {
-            document.getElementById('dash-cash').innerText = db.cash.toFixed(2) + ' د.ل';
             let invVal = db.products.reduce((s, p) => s + (p.qty * p.cost), 0);
+
+            // Dashboard
+            document.getElementById('dash-cash').innerText = db.cash.toFixed(2) + ' د.ل';
             document.getElementById('dash-inventory').innerText = invVal.toFixed(2) + ' د.ل';
             document.getElementById('dash-courier').innerText = db.courierPending.toFixed(2) + ' د.ل';
             document.getElementById('dash-owner').innerText = db.ownerCurrent.toFixed(2) + ' د.ل';
             document.getElementById('dash-partner').innerText = db.partnerCurrent.toFixed(2) + ' د.ل';
 
-            let pOpts = db.products.map(p => `<option value="${p.code}">${p.name} (${p.weight} جرام)</option>`).join('');
-            document.getElementById('pur-prod').innerHTML = pOpts;
-            document.getElementById('sale-prod').innerHTML = pOpts;
+            // COA Balances
+            db.accounts.find(a => a.code === "1111").balance = db.cash;
+            db.accounts.find(a => a.code === "1112").balance = db.courierPending;
+            db.accounts.find(a => a.code === "1120").balance = db.arCustomers;
+            db.accounts.find(a => a.code === "1130").balance = invVal;
+            db.accounts.find(a => a.code === "2110").balance = db.apSuppliers;
+            db.accounts.find(a => a.code === "3110").balance = db.ownerCurrent;
+            db.accounts.find(a => a.code === "3120").balance = db.partnerCurrent;
+            db.accounts.find(a => a.code === "4100").balance = db.totalSales;
+            db.accounts.find(a => a.code === "5100").balance = db.totalCOGS;
+            db.accounts.find(a => a.code === "5200").balance = db.totalExpenses;
 
-            document.getElementById('products-list').innerHTML = db.products.map(p => `
-                <tr><td>${p.code}</td><td>${p.name}</td><td>${p.weight}</td><td>${p.price}</td><td>${p.qty}</td><td>${p.cost.toFixed(2)} د.ل</td></tr>
+            document.getElementById('coa-list').innerHTML = db.accounts.map(a => `
+                <tr>
+                    <td><b>${a.code}</b></td>
+                    <td>${a.name}</td>
+                    <td>${a.type}</td>
+                    <td>${a.nature}</td>
+                    <td><b>${a.balance.toFixed(2)} د.ل</b></td>
+                </tr>
             `).join('');
 
+            // Select Options (Names Only - Clean Interface)
+            let pOpts = db.products.map(p => `<option value="${p.code}">${p.name}</option>`).join('');
+            document.getElementById('pur-prod').innerHTML = pOpts;
+            document.getElementById('sale-prod').innerHTML = pOpts;
+            document.getElementById('adj-prod').innerHTML = pOpts;
+
+            // Products Table
+            document.getElementById('products-list').innerHTML = db.products.map(p => `
+                <tr><td>${p.code}</td><td><b>${p.name}</b></td><td>${p.weight} جرام</td><td>${p.price.toFixed(2)} د.ل</td><td>${p.qty}</td><td>${p.cost.toFixed(2)} د.ل</td></tr>
+            `).join('');
+
+            // Purchases Table
             document.getElementById('purchases-list').innerHTML = db.purchases.map(p => `
                 <tr>
                     <td>${p.id}</td>
@@ -415,21 +636,68 @@
                 </tr>
             `).join('');
 
+            // Shipping Checklist
             document.getElementById('shipping-invoices-list').innerHTML = db.purchases.filter(p => !p.isShipped).map(p => `
-                <div><input type="checkbox" class="ship-chk" value="${p.id}"> فاتورة رقم: ${p.id} - إجمالي الوزن: ${p.weightKG.toFixed(2)} كجم</div>
+                <div style="margin:5px 0;"><input type="checkbox" class="ship-chk" value="${p.id}"> فاتورة رقم: <b>${p.id}</b> - الوزن الإجمالي: ${p.weightKG.toFixed(2)} كجم</div>
+            `).join('') || 'لا توجد فواتير بانتظار الشحن حالياً';
+
+            // Adjustments Table
+            document.getElementById('adj-list').innerHTML = db.stockAdjustments.map(a => `
+                <tr>
+                    <td><b>${a.prodName}</b></td>
+                    <td>${a.bookQty}</td>
+                    <td>${a.actualQty}</td>
+                    <td style="color:${a.diffQty < 0 ? 'var(--danger)':'var(--accent)'}">${a.diffQty}</td>
+                    <td>${a.type} (${a.valAmount.toFixed(2)} د.ل)</td>
+                    <td>${a.reason}</td>
+                </tr>
             `).join('');
 
+            // Journal Table
             document.getElementById('journal-list').innerHTML = db.journal.map(j => `
-                <tr><td>${j.id}</td><td>${j.desc}</td><td>${j.dr}</td><td>${j.cr}</td><td>${j.amount.toFixed(2)}</td></tr>
+                <tr><td>${j.id}</td><td>${j.desc}</td><td>${j.dr}</td><td>${j.cr}</td><td><b>${j.amount.toFixed(2)}</b></td></tr>
             `).join('');
 
+            // Financial Reports
+            let grossProfit = db.totalSales - db.totalCOGS;
+            let netProfit = grossProfit - db.totalExpenses - db.stockAdjNetExpense;
+
+            // Income Statement
             document.getElementById('rep-sales').innerText = db.totalSales.toFixed(2);
             document.getElementById('rep-cogs').innerText = db.totalCOGS.toFixed(2);
+            document.getElementById('rep-gross').innerText = grossProfit.toFixed(2);
             document.getElementById('rep-exp').innerText = db.totalExpenses.toFixed(2);
-            let net = db.totalSales - db.totalCOGS - db.totalExpenses;
-            document.getElementById('rep-netprofit').innerText = net.toFixed(2);
-            document.getElementById('rep-owner-share').innerText = (net > 0 ? net/2 : 0).toFixed(2);
-            document.getElementById('rep-partner-share').innerText = (net > 0 ? net/2 : 0).toFixed(2);
+            document.getElementById('rep-adj-exp').innerText = db.stockAdjNetExpense.toFixed(2);
+            document.getElementById('rep-netprofit').innerText = netProfit.toFixed(2);
+
+            // Balance Sheet
+            let totalAssets = db.cash + invVal + db.courierPending + db.arCustomers;
+            let retainedEarnings = db.isProfitsDistributed ? 0 : netProfit;
+            let totalLiabEquity = db.apSuppliers + db.ownerCurrent + db.partnerCurrent + retainedEarnings;
+
+            document.getElementById('bs-cash').innerText = db.cash.toFixed(2);
+            document.getElementById('bs-inventory').innerText = invVal.toFixed(2);
+            document.getElementById('bs-courier').innerText = db.courierPending.toFixed(2);
+            document.getElementById('bs-ar').innerText = db.arCustomers.toFixed(2);
+            document.getElementById('bs-total-assets').innerText = totalAssets.toFixed(2);
+
+            document.getElementById('bs-ap').innerText = db.apSuppliers.toFixed(2);
+            document.getElementById('bs-owner').innerText = db.ownerCurrent.toFixed(2);
+            document.getElementById('bs-partner').innerText = db.partnerCurrent.toFixed(2);
+            document.getElementById('bs-retained').innerText = retainedEarnings.toFixed(2);
+            document.getElementById('bs-total-liab-equity').innerText = totalLiabEquity.toFixed(2);
+
+            // Equity Statement
+            let totalEquity = db.ownerCurrent + db.partnerCurrent + retainedEarnings;
+            document.getElementById('eq-owner').innerText = db.ownerCurrent.toFixed(2);
+            document.getElementById('eq-partner').innerText = db.partnerCurrent.toFixed(2);
+            document.getElementById('eq-distributed').innerText = (db.isProfitsDistributed ? netProfit : 0).toFixed(2);
+            document.getElementById('eq-total').innerText = totalEquity.toFixed(2);
+
+            // Cash Flow Statement
+            document.getElementById('cf-in').innerText = db.cashInflows.toFixed(2);
+            document.getElementById('cf-out').innerText = db.cashOutflows.toFixed(2);
+            document.getElementById('cf-net').innerText = db.cash.toFixed(2);
         }
 
         updateUI();
