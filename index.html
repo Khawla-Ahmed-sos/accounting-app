@@ -178,7 +178,7 @@
                 <div class="form-group"><label>رقم الفاتورة المستوردة</label><input type="text" id="ai-inv-id" value="INV-AI-2026"></div>
                 <div class="form-group"><label>طريقة الالتزام / السداد</label><select id="ai-pay-type"><option value="owner_current">جاري المالك</option><option value="cash">نقدي</option><option value="bank">مصرف</option></select></div>
             </div>
-            <button class="btn-submit" onclick="runAIImageMatching()">تحليل الصورة بالذكاء الاصطناعي ومطابقة الفاتورة</button>
+            <button class="btn-submit" type="button" onclick="runAIImageMatching()">تحليل الصورة بالذكاء الاصطناعي ومطابقة الفاتورة</button>
         </div>
         <div id="ai-result-feedback" style="margin-top: 15px; font-weight: 600; color: var(--accent);"></div>
     </div>
@@ -341,7 +341,7 @@
                 <p>حساب جاري الشريك: <b id="eq-partner">0</b> د.ل</p>
                 <p>أرباح موزعة: <b id="eq-distributed">0</b> د.ل</p>
                 <hr style="margin:10px 0;">
-                <h4>إجمالي حقوق الملكية: <span id="eq-total">0</b> د.ل</h4>
+                <h4>إجمالي حقوق الملكية: <span id="eq-total">0</span> د.ل</h4>
             </div>
             <div class="financial-box">
                 <h3>4. التدفقات النقدية</h3>
@@ -356,59 +356,74 @@
     </div>
 
     <script>
-        let savedDb = localStorage.getItem('erp_system_db_qtouf_v3');
-        let db = savedDb ? JSON.parse(savedDb) : {
-            companyName: "شركة قطوف ومستحضرات التجميل",
-            standardExchangeRate: 6.0,
-            cash: 5000,
-            bank: 0,
-            initialCash: 5000,
-            courierPending: 0,
-            arCustomers: 0,
-            transitVal: 0,
-            fxGainLoss: 0,
-            products: [
-                { code: "MK-101", name: "أحمر شفاه مات", weight: 30, price: 25.0, qty: 10, cost: 15.0 }
-            ],
-            purchases: [],
-            pendingSales: [],
-            sales: [],
-            journal: [],
-            stockAdjustments: [],
-            accounts: [
-                { code: "1111", name: "الخزينة الرئيسية", type: "أصول متداولة", nature: "مدين", balance: 5000 },
-                { code: "1113", name: "حساب المصرف (البنك)", type: "أصول متداولة", nature: "مدين", balance: 0 },
-                { code: "1112", name: "أرصدة شركات التوصيل المعلقة", type: "أصول متداولة", nature: "مدين", balance: 0 },
-                { code: "1120", name: "ذمم مدينة (الزبائن الآجل)", type: "أصول متداولة", nature: "مدين", balance: 0 },
-                { code: "1131", name: "مخزن بضائع قيد الطريق", type: "أصول متداولة", nature: "مدين", balance: 0 },
-                { code: "1130", name: "المخزون الرئيسي", type: "أصول متداولة", nature: "مدين", balance: 150 },
-                { code: "2110", name: "الموردون (ذمم دائنة محلية)", type: "التزامات متداولة", nature: "دائن", balance: 0 },
-                { code: "3110", name: "جاري المالك", type: "حقوق الملكية", nature: "دائن", balance: 5000 },
-                { code: "3120", name: "جاري الشريك", type: "حقوق الملكية", nature: "دائن", balance: 0 },
-                { code: "3200", name: "الأرباح المبقاة", type: "حقوق الملكية", nature: "دائن", balance: 0 },
-                { code: "4100", name: "إيرادات المبيعات", type: "إيرادات", nature: "دائن", balance: 0 },
-                { code: "4200", name: "إيرادات تسوية مخزون (فائض)", type: "إيرادات", nature: "دائن", balance: 0 },
-                { code: "4300", name: "أرباح فروق عملة", type: "إيرادات", nature: "دائن", balance: 0 },
-                { code: "5100", name: "تكلفة البضاعة المباعة (COGS)", type: "تكاليف", nature: "مدين", balance: 0 },
-                { code: "5200", name: "مصاريف وعمولات التوصيل", type: "مصاريف", nature: "مدين", balance: 0 },
-                { code: "5300", name: "خسائر العجز والتلف والتسويات الجردية", type: "مصاريف", nature: "مدين", balance: 0 },
-                { code: "5400", name: "خسائر فروق عملة", type: "مصاريف", nature: "مدين", balance: 0 }
-            ],
-            apSuppliers: 0,
-            ownerCurrent: 5000,
-            partnerCurrent: 0,
-            totalSales: 0,
-            totalCOGS: 0,
-            totalExpenses: 0,
-            stockAdjNetLoss: 0,
-            cashInflows: 0,
-            cashOutflows: 0,
-            isProfitsDistributed: false,
-            journalId: 101
-        };
+        // استرجاع البيانات المحفوظة دائمًا من LocalStorage
+        let db;
+        try {
+            let savedDb = localStorage.getItem('erp_system_db_qtouf_v4');
+            db = savedDb ? JSON.parse(savedDb) : null;
+        } catch(e) {
+            db = null;
+        }
 
+        if (!db) {
+            db = {
+                companyName: "شركة قطوف ومستحضرات التجميل",
+                standardExchangeRate: 6.0,
+                cash: 5000,
+                bank: 0,
+                initialCash: 5000,
+                courierPending: 0,
+                arCustomers: 0,
+                transitVal: 0,
+                fxGainLoss: 0,
+                products: [
+                    { code: "MK-101", name: "أحمر شفاه مات", weight: 30, price: 25.0, qty: 10, cost: 15.0 }
+                ],
+                purchases: [],
+                pendingSales: [],
+                sales: [],
+                journal: [],
+                stockAdjustments: [],
+                accounts: [
+                    { code: "1111", name: "الخزينة الرئيسية", type: "أصول متداولة", nature: "مدين", balance: 5000 },
+                    { code: "1113", name: "حساب المصرف (البنك)", type: "أصول متداولة", nature: "مدين", balance: 0 },
+                    { code: "1112", name: "أرصدة شركات التوصيل المعلقة", type: "أصول متداولة", nature: "مدين", balance: 0 },
+                    { code: "1120", name: "ذمم مدينة (الزبائن الآجل)", type: "أصول متداولة", nature: "مدين", balance: 0 },
+                    { code: "1131", name: "مخزن بضائع قيد الطريق", type: "أصول متداولة", nature: "مدين", balance: 0 },
+                    { code: "1130", name: "المخزون الرئيسي", type: "أصول متداولة", nature: "مدين", balance: 150 },
+                    { code: "2110", name: "الموردون (ذمم دائنة محلية)", type: "التزامات متداولة", nature: "دائن", balance: 0 },
+                    { code: "3110", name: "جاري المالك", type: "حقوق الملكية", nature: "دائن", balance: 5000 },
+                    { code: "3120", name: "جاري الشريك", type: "حقوق الملكية", nature: "دائن", balance: 0 },
+                    { code: "3200", name: "الأرباح المبقاة", type: "حقوق الملكية", nature: "دائن", balance: 0 },
+                    { code: "4100", name: "إيرادات المبيعات", type: "إيرادات", nature: "دائن", balance: 0 },
+                    { code: "4200", name: "إيرادات تسوية مخزون (فائض)", type: "إيرادات", nature: "دائن", balance: 0 },
+                    { code: "4300", name: "أرباح فروق عملة", type: "إيرادات", nature: "دائن", balance: 0 },
+                    { code: "5100", name: "تكلفة البضاعة المباعة (COGS)", type: "تكاليف", nature: "مدين", balance: 0 },
+                    { code: "5200", name: "مصاريف وعمولات التوصيل", type: "مصاريف", nature: "مدين", balance: 0 },
+                    { code: "5300", name: "خسائر العجز والتلف والتسويات الجردية", type: "مصاريف", nature: "مدين", balance: 0 },
+                    { code: "5400", name: "خسائر فروق عملة", type: "مصاريف", nature: "مدين", balance: 0 }
+                ],
+                apSuppliers: 0,
+                ownerCurrent: 5000,
+                partnerCurrent: 0,
+                totalSales: 0,
+                totalCOGS: 0,
+                totalExpenses: 0,
+                stockAdjNetLoss: 0,
+                cashInflows: 0,
+                cashOutflows: 0,
+                isProfitsDistributed: false,
+                journalId: 101
+            };
+        }
+
+        // دالة مركزية وآمنة لحفظ البيانات فوراً في المتصفح وتحديث الشاشة
         function persistAndSync() {
-            localStorage.setItem('erp_system_db_qtouf_v3', JSON.stringify(db));
+            try {
+                localStorage.setItem('erp_system_db_qtouf_v4', JSON.stringify(db));
+            } catch(e) {
+                console.error("Storage error:", e);
+            }
             updateUI();
         }
 
@@ -417,7 +432,6 @@
             document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             event.target.classList.add('active');
-            persistAndSync();
         }
 
         function saveOpeningBalances(e) {
@@ -444,7 +458,6 @@
             document.getElementById('header-company-name').innerText = db.companyName;
             persistAndSync();
             alert('تم حفظ الإعدادات واعتماد الأرصدة الافتتاحية بنجاح!');
-            showTab('dashboard');
         }
 
         function addProduct(e) {
@@ -465,7 +478,6 @@
             document.getElementById('p-price').value = '';
         }
 
-        // الذكاء الاصطناعي لتحليل سكرين شوت الفاتورة المرفوعة
         function runAIImageMatching() {
             let fileInput = document.getElementById('ai-invoice-file');
             let invId = document.getElementById('ai-inv-id').value;
@@ -473,7 +485,7 @@
 
             if(fileInput.files.length === 0) return alert('يرجى رفع صورة الفاتورة (Screenshot) أولاً!');
 
-            let matchedProd = db.products[0];
+            let matchedProd = db.products[0] || { code: "MK-101", name: "أحمر شفاه مات", weight: 30 };
             let qty = 25;
             let unitPriceFC = 4.0;
 
@@ -654,7 +666,6 @@
             alert('تم تسجيل التسوية الجردية بنجاح!');
         }
 
-        // إدارة طلبات البيع المعلقة وتأكيدها لتتحول إلى المبيعات الفعلية
         function addPendingSale(e) {
             e.preventDefault();
             let pCode = document.getElementById('pend-prod').value;
@@ -699,7 +710,6 @@
             db.totalCOGS += cogs;
             order.isDelivered = true;
 
-            // ترحيل الطلب إلى سجل المبيعات الفعلية
             db.sales.push({
                 ref: order.id,
                 channel: `${order.customer} (${order.channel})`,
@@ -764,6 +774,7 @@
         function updateUI() {
             let invVal = db.products.reduce((s, p) => s + (p.qty * p.cost), 0);
 
+            document.getElementById('header-company-name').innerText = db.companyName;
             document.getElementById('dash-cash').innerText = db.cash.toFixed(2) + ' د.ل';
             document.getElementById('dash-bank').innerText = db.bank.toFixed(2) + ' د.ل';
             document.getElementById('dash-inventory').innerText = invVal.toFixed(2) + ' د.ل';
@@ -813,7 +824,6 @@
                 </tr>
             `).join('') || '<tr><td colspan="7" style="color:var(--text-muted);">لا توجد فواتير شراء مسجلة حتى الآن</td></tr>';
 
-            // جدول طلبات البيع المعلقة
             document.getElementById('pending-sales-list').innerHTML = db.pendingSales.map(o => `
                 <tr>
                     <td><b>${o.id}</b></td>
@@ -828,7 +838,6 @@
                 </tr>
             `).join('') || '<tr><td colspan="7" style="color:var(--text-muted);">لا توجد طلبات بيع معلقة حالياً</td></tr>';
 
-            // جدول سجل المبيعات الفعلي
             document.getElementById('sales-list').innerHTML = db.sales.map(s => `
                 <tr>
                     <td><b>${s.ref}</b></td>
@@ -884,6 +893,7 @@
             document.getElementById('cf-net').innerText = db.cash.toFixed(2);
         }
 
+        // تشغيل تحديث الشاشة وقراءة البيانات المحفوظة عند فتح الصفحة فوراً
         updateUI();
     </script>
 </body>
