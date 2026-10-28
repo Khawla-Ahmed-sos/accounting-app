@@ -81,7 +81,7 @@
     <header>
         <div>
             <h1>النظام المحاسبي المتكامل (ERP)</h1>
-            <p>إدارة مشتريات الاستيراد والمحلي، بضائع قيد الطريق، التكاليف، والتسويات</p>
+            <p>إدارة مشتريات الاستيراد، سعر الصرف الموحد، بضائع قيد الطريق، وفروق العملة</p>
         </div>
         <div class="company-title" id="header-company-name">اسم الشركة الافتتاحي</div>
     </header>
@@ -103,10 +103,11 @@
     <!-- Opening Balances & Company Setup -->
     <div id="opening_balances" class="section active">
         <h2>إعدادات الشركة والأرصدة الافتتاحية (البداية)</h2>
-        <div class="note-box">قم بكتابة اسم شركتك وتحديد الأرصدة الأولية المتاحة لتبدأ العمل بها فوراً عبر التطبيق.</div>
+        <div class="note-box">قم بكتابة اسم شركتك وتحديد الأرصدة الأولية وسعر الصرف الموحد المعتمد في الدفاتر لتبدأ العمل بها فوراً.</div>
         <form onsubmit="saveOpeningBalances(event)">
             <div class="form-grid">
                 <div class="form-group"><label>اسم الشركة الرسمي</label><input type="text" id="op-company-name" value="شركة قطوف ومستحضرات التجميل" required></div>
+                <div class="form-group"><label>سعر الصرف الموحد الدفتري (مثال: 6.0)</label><input type="number" id="op-exchange-rate" step="0.01" value="6.0" required></div>
                 <div class="form-group"><label>رصيد الخزينة الافتتاحي (د.ل)</label><input type="number" id="op-cash" step="0.1" value="5000" required></div>
                 <div class="form-group"><label>رصيد المصرف الافتتاحي (د.ل)</label><input type="number" id="op-bank" step="0.1" value="0" required></div>
                 <div class="form-group"><label>قيمة المخزون الافتتاحي (د.ل)</label><input type="number" id="op-inventory" step="0.1" value="0" required></div>
@@ -114,7 +115,7 @@
                 <div class="form-group"><label>الذمم المدينة الأولية / الزبائن (د.ل)</label><input type="number" id="op-ar" step="0.1" value="0" required></div>
                 <div class="form-group"><label>رصيد جاري المالك الافتتاحي (د.ل)</label><input type="number" id="op-owner" step="0.1" value="5000" required></div>
             </div>
-            <button class="btn-submit" type="submit">حفظ اسم الشركة واعتماد الأرصدة الافتتاحية</button>
+            <button class="btn-submit" type="submit">حفظ الإعدادات واعتماد الأرصدة الافتتاحية</button>
         </form>
     </div>
 
@@ -166,23 +167,23 @@
 
     <!-- Purchases -->
     <div id="purchases" class="section">
-        <h2>فواتير المشتريات وإثبات وصول البضاعة (GRN)</h2>
-        <div class="note-box">عند تسجيل الفاتورة تذهب البضاعة إلى "قيد الطريق"، وعند وصولها فعلياً، اضغط على زر "تأكيد الوصول" لتنضم للمخزن الرئيسي.</div>
+        <h2>فواتير المشتريات (سعر موحد وتسوية السداد وفروق الصرف)</h2>
+        <div class="note-box">تسجل الفواتير بسعر الصرف الموحد الدفتري. وعند السداد بسعر مختلف، يعالج النظام فروق الصرف آلياً.</div>
         <form onsubmit="addPurchase(event)">
             <div class="form-grid">
                 <div class="form-group"><label>رقم الفاتورة</label><input type="text" id="pur-id" required></div>
-                <div class="form-group"><label>نوع الطلب</label><select id="pur-order-type" onchange="togglePurchaseType()"><option value="local">محلي</option><option value="import">استيراد</option></select></div>
-                <div class="form-group"><label>نوع الدفع</label><select id="pur-pay-type"><option value="cash">نقدي</option><option value="bank">مصرف</option><option value="on_account">على الحساب</option><option value="owner_current">جاري المالك</option></select></div>
+                <div class="form-group"><label>نوع الطلب</label><select id="pur-order-type"><option value="import">استيراد (عملة أجنبية)</option><option value="local">محلي</option></select></div>
+                <div class="form-group"><label>طريقة الدفع/الالتزام</label><select id="pur-pay-type"><option value="owner_current">جاري المالك (دين للمالك)</option><option value="cash">نقدي</option><option value="bank">مصرف</option></select></div>
                 <div class="form-group"><label>الصنف</label><select id="pur-prod"></select></div>
                 <div class="form-group"><label>الكمية المشترات</label><input type="number" id="pur-qty" required></div>
-                <div class="form-group"><label>سعر الوحدة</label><input type="number" id="pur-price" step="0.01" required></div>
-                <div class="form-group" id="group-rate" style="display:none;"><label>سعر الصرف الموحد</label><input type="number" id="pur-rate" value="6.0" step="0.01"></div>
+                <div class="form-group"><label>سعر الوحدة بالعملة الأجنبية</label><input type="number" id="pur-price" step="0.01" required></div>
+                <div class="form-group"><label>سعر الصرف الفعلي عند الشراء (اختياري)</label><input type="number" id="pur-actual-rate" step="0.01" placeholder="إذا اختلف عن الموحد"></div>
             </div>
-            <button class="btn-submit" type="submit">تسجيل الفاتورة (بضائع قيد الطريق)</button>
+            <button class="btn-submit" type="submit">تسجيل الفاتورة وإيداعها قيد الطريق</button>
         </form>
         <table>
             <thead>
-                <tr><th>رقم الفاتورة</th><th>نوع الطلب</th><th>طريقة الدفع</th><th>الصنف</th><th>الكمية</th><th>إجمالي الوزن</th><th>القيمة (د.ل)</th><th>حالة البضاعة</th><th>إجراء استلام المخزن</th></tr>
+                <tr><th>رقم الفاتورة</th><th>الصنف</th><th>الكمية</th><th>القيمة بالسعر الموحد</th><th>حالة البضاعة</th><th>إجراء الاستلام</th><th>إجراء السداد وتسوية فروق الصرف</th></tr>
             </thead>
             <tbody id="purchases-list"></tbody>
         </table>
@@ -274,6 +275,7 @@
                 <p><b>مجمل الربح: <span id="rep-gross">0</span> د.ل</b></p>
                 <p>يخصم: عمولات ومصاريف التوصيل: <b id="rep-exp">0</b> د.ل</p>
                 <p>يخصم: خسائر التسويات الجردية: <b id="rep-adj-loss">0</b> د.ل</p>
+                <p>أرباح/خسائر فروق العملة: <b id="rep-fx">0</b> د.ل</p>
                 <hr style="margin:10px 0;">
                 <h4>صافي ربح الدورة: <span id="rep-netprofit" style="color:var(--accent);">0</span> د.ل</h4>
             </div>
@@ -320,12 +322,14 @@
     <script>
         let db = {
             companyName: "شركة قطوف ومستحضرات التجميل",
+            standardExchangeRate: 6.0,
             cash: 5000,
             bank: 0,
             initialCash: 5000,
             courierPending: 0,
             arCustomers: 0,
             transitVal: 0,
+            fxGainLoss: 0,
             products: [],
             purchases: [],
             journal: [],
@@ -343,9 +347,11 @@
                 { code: "3200", name: "الأرباح المبقاة", type: "حقوق الملكية", nature: "دائن", balance: 0 },
                 { code: "4100", name: "إيرادات المبيعات", type: "إيرادات", nature: "دائن", balance: 0 },
                 { code: "4200", name: "إيرادات تسوية مخزون (فائض)", type: "إيرادات", nature: "دائن", balance: 0 },
+                { code: "4300", name: "أرباح فروق عملة", type: "إيرادات", nature: "دائن", balance: 0 },
                 { code: "5100", name: "تكلفة البضاعة المباعة (COGS)", type: "تكاليف", nature: "مدين", balance: 0 },
                 { code: "5200", name: "مصاريف وعمولات التوصيل", type: "مصاريف", nature: "مدين", balance: 0 },
-                { code: "5300", name: "خسائر العجز والتلف والتسويات الجردية", type: "مصاريف", nature: "مدين", balance: 0 }
+                { code: "5300", name: "خسائر العجز والتلف والتسويات الجردية", type: "مصاريف", nature: "مدين", balance: 0 },
+                { code: "5400", name: "خسائر فروق عملة", type: "مصاريف", nature: "مدين", balance: 0 }
             ],
             apSuppliers: 0,
             ownerCurrent: 5000,
@@ -371,6 +377,7 @@
         function saveOpeningBalances(e) {
             e.preventDefault();
             db.companyName = document.getElementById('op-company-name').value;
+            db.standardExchangeRate = parseFloat(document.getElementById('op-exchange-rate').value) || 6.0;
             let opCash = parseFloat(document.getElementById('op-cash').value) || 0;
             let opBank = parseFloat(document.getElementById('op-bank').value) || 0;
             let opInv = parseFloat(document.getElementById('op-inventory').value) || 0;
@@ -389,13 +396,8 @@
             addJournal("قيد الافتتاح (الأرصدة الأولية لـ " + db.companyName + ")", "الخزينة + المصرف + المخزون + شركات التوصيل + الذمم", "جاري المالك", totalAssets);
 
             document.getElementById('header-company-name').innerText = db.companyName;
-            alert('تم حفظ اسم الشركة واعتماد الأرصدة الافتتاحية بنجاح!');
+            alert('تم حفظ الإعدادات واعتماد الأرصدة الافتتاحية بنجاح!');
             showTab('dashboard');
-        }
-
-        function togglePurchaseType() {
-            let orderType = document.getElementById('pur-order-type').value;
-            document.getElementById('group-rate').style.display = (orderType === 'import') ? 'block' : 'none';
         }
 
         function addProduct(e) {
@@ -423,48 +425,70 @@
             if(!product) return alert('يرجى اختيار صنف صحيح');
 
             let qty = parseInt(document.getElementById('pur-qty').value);
-            let unitPrice = parseFloat(document.getElementById('pur-price').value);
-            let orderType = document.getElementById('pur-order-type').value;
+            let unitPriceFC = parseFloat(document.getElementById('pur-price').value);
             let payType = document.getElementById('pur-pay-type').value;
-            let rate = (orderType === 'import') ? parseFloat(document.getElementById('pur-rate').value) : 1.0;
-            
-            let totalAmountLYD = qty * unitPrice * rate;
+
+            let standardAmountLYD = qty * unitPriceFC * db.standardExchangeRate;
             let totalWeightKG = (product.weight * qty) / 1000.0;
 
             db.purchases.push({
                 id: document.getElementById('pur-id').value,
-                orderType: orderType,
                 payType: payType,
                 prodCode: pCode,
                 qty: qty,
                 weightKG: totalWeightKG,
-                amountLYD: totalAmountLYD,
-                unitPriceLYD: totalAmountLYD / qty,
+                foreignAmount: qty * unitPriceFC,
+                standardAmountLYD: standardAmountLYD,
+                unitPriceLYD: standardAmountLYD / qty,
                 isReceived: false,
-                isShipped: false
+                isShipped: false,
+                isSettled: false
             });
 
-            // Put in Goods in Transit initially
-            db.transitVal += totalAmountLYD;
+            db.transitVal += standardAmountLYD;
 
-            if(payType === 'cash') {
-                if(db.cash < totalAmountLYD) return alert('الرصيد النقدي غير كافٍ');
-                addJournal("فاتورة شراء نقدي (قيد الطريق) - " + document.getElementById('pur-id').value, "مخزن بضائع قيد الطريق", "الخزينة الرئيسية", totalAmountLYD);
-                db.cash -= totalAmountLYD;
-                db.cashOutflows += totalAmountLYD;
+            if(payType === 'owner_current') {
+                addJournal("فاتورة شراء جاري المالك (سعر موحد) - " + document.getElementById('pur-id').value, "مخزن بضائع قيد الطريق", "جاري المالك", standardAmountLYD);
+                db.ownerCurrent += standardAmountLYD;
+            } else if(payType === 'cash') {
+                addJournal("فاتورة شراء نقدي - " + document.getElementById('pur-id').value, "مخزن بضائع قيد الطريق", "الخزينة الرئيسية", standardAmountLYD);
+                db.cash -= standardAmountLYD;
+                db.cashOutflows += standardAmountLYD;
             } else if(payType === 'bank') {
-                if(db.bank < totalAmountLYD) return alert('رصيد المصرف غير كافٍ');
-                addJournal("فاتورة شراء بالمصرف (قيد الطريق) - " + document.getElementById('pur-id').value, "مخزن بضائع قيد الطريق", "حساب المصرف (البنك)", totalAmountLYD);
-                db.bank -= totalAmountLYD;
-            } else if(payType === 'on_account') {
-                addJournal("فاتورة شراء على الحساب (قيد الطريق) - " + document.getElementById('pur-id').value, "مخزن بضائع قيد الطريق", "الموردون (ذمم دائنة محلية)", totalAmountLYD);
-                db.apSuppliers += totalAmountLYD;
-            } else if(payType === 'owner_current') {
-                addJournal("فاتورة شراء جاري المالك (قيد الطريق) - " + document.getElementById('pur-id').value, "مخزن بضائع قيد الطريق", "جاري المالك", totalAmountLYD);
-                db.ownerCurrent += totalAmountLYD;
+                addJournal("فاتورة شراء بالمصرف - " + document.getElementById('pur-id').value, "مخزن بضائع قيد الطريق", "حساب المصرف (البنك)", standardAmountLYD);
+                db.bank -= standardAmountLYD;
             }
 
-            alert('تم تسجيل الفاتورة وإيداع البضائع في "قيد الطريق" لحين وصولها للمخزن!');
+            alert('تم تسجيل الفاتورة بالسعر الموحد وإيداعها قيد الطريق!');
+            updateUI();
+        }
+
+        function settlePurchase(purId) {
+            let p = db.purchases.find(item => item.id === purId);
+            if(!p || p.isSettled) return;
+
+            let customSettleAmount = prompt("أدخل المبلغ الفعلي الذي تقرر الشركة سداده لتسوية الفاتورة (د.ل):", p.standardAmountLYD);
+            if(customSettleAmount === null) return;
+            let paidLYD = parseFloat(customSettleAmount);
+
+            let diff = paidLYD - p.standardAmountLYD;
+            p.isSettled = true;
+
+            if(p.payType === 'owner_current') {
+                db.ownerCurrent -= p.standardAmountLYD;
+                if(diff > 0) {
+                    db.fxGainLoss += diff;
+                    addJournal("تسوية وسداد فاتورة الشراء مع فروق صرف", "جاري المالك (تسوية) + خسائر فروق عملة (" + diff.toFixed(2) + ")", "الخزينة / المصرف", paidLYD);
+                } else if(diff < 0) {
+                    let gain = Math.abs(diff);
+                    db.fxGainLoss -= gain;
+                    addJournal("تسوية وسداد فاتورة الشراء مع أرباح فروق صرف", "جاري المالك (تسوية)", "الخزينة / المصرف + أرباح فروق عملة (" + gain.toFixed(2) + ")", paidLYD);
+                } else {
+                    addJournal("تسوية وسداد فاتورة الشراء بالقيمة الدفترية", "جاري المالك", "الخزينة / المصرف", paidLYD);
+                }
+            }
+
+            alert('تمت تسوية الفاتورة ومعالجة فروق الصرف محاسبياً بنجاح!');
             updateUI();
         }
 
@@ -473,15 +497,14 @@
             if(!p || p.isReceived) return;
 
             p.isReceived = true;
-            db.transitVal -= p.amountLYD;
+            db.transitVal -= p.standardAmountLYD;
 
             let prod = db.products.find(item => item.code === p.prodCode);
             prod.qty += p.qty;
-            prod.cost = p.unitPriceLYD; // Base cost before shipping allocation
+            prod.cost = p.unitPriceLYD;
 
-            addJournal("إذن استلام مخزون (وصول بضاعة الفاتورة " + p.id + ")", "المخزون الرئيسي", "مخزن بضائع قيد الطريق", p.amountLYD);
-
-            alert('تمت تأكيد وصول البضاعة للمخزن الرئيسي بنجاح وأصبحت متاحة للبيع وتوزيع الشحن!');
+            addJournal("إذن استلام مخزون (وصول بضاعة الفاتورة " + p.id + ")", "المخزون الرئيسي", "مخزن بضائع قيد الطريق", p.standardAmountLYD);
+            alert('تمت تأكيد وصول البضاعة للمخزن الرئيسي بنجاح!');
             updateUI();
         }
 
@@ -494,8 +517,6 @@
             if(db.cash < totalFreightCost) return alert('رصيد الخزينة غير كافٍ لسداد الشحن!');
 
             let targetPurchases = db.purchases.filter(p => selectedInvoices.includes(p.id) && p.isReceived);
-            if(targetPurchases.length === 0) return alert('الفواتير المحددة لم يتم تأكيد استلامها للمخزن بعد!');
-
             let totalWeight = targetPurchases.reduce((sum, p) => sum + p.weightKG, 0);
 
             targetPurchases.forEach(p => {
@@ -509,14 +530,14 @@
             addJournal("سداد مصاريف شحن وجمارك إجمالية", "المخزون الرئيسي (Landed Cost)", "الخزينة الرئيسية", totalFreightCost);
             db.cash -= totalFreightCost;
             db.cashOutflows += totalFreightCost;
-            alert('تم توزيع مصاريف الشحن بنجاح على المخزون المستلم!');
+            alert('تم توزيع مصاريف الشحن بنجاح!');
             updateUI();
         }
 
         function processStockAdjustment(e) {
             e.preventDefault();
             let pCode = document.getElementById('adj-prod').value;
-            let prod = db.products.find(p => p.code === pCode);
+            let prod = db.products.find(item => item.code === pCode);
             let actualQty = parseInt(document.getElementById('adj-actual-qty').value);
             let adjType = document.getElementById('adj-type').value;
             let reason = document.getElementById('adj-reason').value;
@@ -541,7 +562,7 @@
         function addSale(e) {
             e.preventDefault();
             let pCode = document.getElementById('sale-prod').value;
-            let prod = db.products.find(p => p.code === pCode);
+            let prod = db.products.find(item => item.code === pCode);
             let qty = parseInt(document.getElementById('sale-qty').value);
             let price = parseFloat(document.getElementById('sale-price').value);
             let nature = document.getElementById('sale-nature').value;
@@ -591,7 +612,7 @@
         }
 
         function distributeProfits() {
-            let netProfit = db.totalSales - db.totalCOGS - db.totalExpenses - db.stockAdjNetLoss;
+            let netProfit = db.totalSales - db.totalCOGS - db.totalExpenses - db.stockAdjNetLoss + db.fxGainLoss;
             if(netProfit <= 0) return alert('لا توجد أرباح قابلة للتوزيع');
             if(db.isProfitsDistributed) return alert('تم توزيع أرباح هذه الفترة مسبقاً');
 
@@ -631,6 +652,8 @@
             db.accounts.find(a => a.code === "4100").balance = db.totalSales;
             db.accounts.find(a => a.code === "5100").balance = db.totalCOGS;
             db.accounts.find(a => a.code === "5200").balance = db.totalExpenses;
+            db.accounts.find(a => a.code === "5400").balance = Math.max(0, -db.fxGainLoss);
+            db.accounts.find(a => a.code === "4300").balance = Math.max(0, db.fxGainLoss);
 
             document.getElementById('coa-list').innerHTML = db.accounts.map(a => `<tr><td><b>${a.code}</b></td><td>${a.name}</td><td>${a.type}</td><td>${a.nature}</td><td><b>${a.balance.toFixed(2)} د.ل</b></td></tr>`).join('');
 
@@ -644,14 +667,12 @@
             document.getElementById('purchases-list').innerHTML = db.purchases.map(p => `
                 <tr>
                     <td>${p.id}</td>
-                    <td><span class="badge ${p.orderType === 'import' ? 'badge-transit' : 'badge-received'}">${p.orderType}</span></td>
-                    <td>${p.payType}</td>
                     <td>${p.prodCode}</td>
                     <td>${p.qty}</td>
-                    <td>${p.weightKG.toFixed(2)} كجم</td>
-                    <td>${p.amountLYD.toFixed(2)} د.ل</td>
-                    <td><span class="badge ${p.isReceived ? 'badge-received' : 'badge-transit'}">${p.isReceived ? 'مستلم بالمخزن' : 'قيد الطريق'}</span></td>
+                    <td><b>${p.standardAmountLYD.toFixed(2)} د.ل</b></td>
+                    <td><span class="badge ${p.isReceived ? 'badge-received' : 'badge-transit'}">${p.isReceived ? 'مستلم' : 'قيد الطريق'}</span></td>
                     <td>${p.isReceived ? '-' : `<button class="btn-action" onclick="confirmGoodsReceipt('${p.id}')">تأكيد الوصول</button>`}</td>
+                    <td>${p.isSettled ? '<span style="color:var(--accent); font-weight:600;">تمت التسوية</span>' : `<button class="btn-action" style="background:var(--accent);" onclick="settlePurchase('${p.id}')">سداد وتسوية</button>`}</td>
                 </tr>
             `).join('');
 
@@ -660,13 +681,14 @@
             document.getElementById('journal-list').innerHTML = db.journal.map(j => `<tr><td>${j.id}</td><td>${j.desc}</td><td>${j.dr}</td><td>${j.cr}</td><td><b>${j.amount.toFixed(2)}</b></td></tr>`).join('');
 
             let grossProfit = db.totalSales - db.totalCOGS;
-            let netProfit = grossProfit - db.totalExpenses - db.stockAdjNetLoss;
+            let netProfit = grossProfit - db.totalExpenses - db.stockAdjNetLoss + db.fxGainLoss;
 
             document.getElementById('rep-sales').innerText = db.totalSales.toFixed(2);
             document.getElementById('rep-cogs').innerText = db.totalCOGS.toFixed(2);
             document.getElementById('rep-gross').innerText = grossProfit.toFixed(2);
             document.getElementById('rep-exp').innerText = db.totalExpenses.toFixed(2);
             document.getElementById('rep-adj-loss').innerText = db.stockAdjNetLoss.toFixed(2);
+            document.getElementById('rep-fx').innerText = db.fxGainLoss.toFixed(2);
             document.getElementById('rep-netprofit').innerText = netProfit.toFixed(2);
 
             let totalAssets = db.cash + db.bank + invVal + db.transitVal + db.courierPending + db.arCustomers;
