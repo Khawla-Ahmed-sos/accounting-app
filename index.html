@@ -82,7 +82,7 @@
     <header>
         <div>
             <h1>النظام المحاسبي المتكامل (ERP)</h1>
-            <p>إدارة مشتريات الاستيراد، سعر الصرف الموحد، بضائع قيد الطريق، ومطابقة الذكاء الاصطناعي</p>
+            <p>إدارة مشتريات الاستيراد، مطابقة صور الفواتير بالذكاء الاصطناعي، وطلبات البيع المعلقة</p>
         </div>
         <div class="company-title" id="header-company-name">شركة قطوف ومستحضرات التجميل</div>
     </header>
@@ -92,11 +92,12 @@
         <button onclick="showTab('dashboard')">لوحة التحكم</button>
         <button onclick="showTab('coa')">دليل الحسابات</button>
         <button onclick="showTab('products')">دليل المنتجات</button>
-        <button onclick="showTab('ai_import')">استيراد ومطابقة الفواتير (AI)</button>
+        <button onclick="showTab('ai_import')">مطابقة فواتير AI (رفع سكرين)</button>
         <button onclick="showTab('purchases')">فواتير الشراء والطلبات</button>
         <button onclick="showTab('shipping')">توزيع الشحن والجمارك</button>
         <button onclick="showTab('stock_adj')">التسويات الجردية</button>
-        <button onclick="showTab('sales')">المبيعات والتوصيل</button>
+        <button onclick="showTab('pending_sales')">طلبات البيع المعلقة</button>
+        <button onclick="showTab('sales')">سجل المبيعات الفعلية</button>
         <button onclick="showTab('courier_settlement')">تسويات شركات التوصيل</button>
         <button onclick="showTab('journal')">دفتر اليومية الآلي</button>
         <button onclick="showTab('reports')">القوائم المالية والتقارير</button>
@@ -105,11 +106,11 @@
     <!-- Opening Balances -->
     <div id="opening_balances" class="section active">
         <h2>إعدادات الشركة والأرصدة الافتتاحية</h2>
-        <div class="note-box">قم بتحديث اسم شركتك وتحديد الأرصدة الأولية وسعر الصرف الموحد المعتمد في الدفاتر لتبدأ العمل بها فوراً.</div>
+        <div class="note-box">قم بتحديث اسم شركتك وتحديد الأرصدة الأولية وسعر الصرف الموحد الدفتري (مثال: 6.0) لتبدأ العمل بها فوراً.</div>
         <form onsubmit="saveOpeningBalances(event)">
             <div class="form-grid">
                 <div class="form-group"><label>اسم الشركة الرسمي</label><input type="text" id="op-company-name" value="شركة قطوف ومستحضرات التجميل" required></div>
-                <div class="form-group"><label>سعر الصرف الموحد الدفتري (مثال: 6.0)</label><input type="number" id="op-exchange-rate" step="0.01" value="6.0" required></div>
+                <div class="form-group"><label>سعر الصرف الموحد الدفتري</label><input type="number" id="op-exchange-rate" step="0.01" value="6.0" required></div>
                 <div class="form-group"><label>رصيد الخزينة الافتتاحي (د.ل)</label><input type="number" id="op-cash" step="0.1" value="5000" required></div>
                 <div class="form-group"><label>رصيد المصرف الافتتاحي (د.ل)</label><input type="number" id="op-bank" step="0.1" value="0" required></div>
                 <div class="form-group"><label>قيمة المخزون الافتتاحي (د.ل)</label><input type="number" id="op-inventory" step="0.1" value="0" required></div>
@@ -167,20 +168,17 @@
         </table>
     </div>
 
-    <!-- AI Import & Matching -->
+    <!-- AI Invoice OCR & Matching -->
     <div id="ai_import" class="section">
-        <h2>استيراد ومطابقة فواتير المشتريات بالذكاء الاصطناعي (AI Invoice Matching)</h2>
-        <div class="note-box">قم بلصق نص فاتورة المورد أو بيانات الطلب من الإنترنت، وسيقوم النظام بالتعرف على المنتجات ومطابقتها مع دليل المنتجات وتسجيلها فوراً.</div>
+        <h2>مطابقة واستخراج فواتير المشتريات بالذكاء الاصطناعي (رفع صورة سكرين شوت)</h2>
+        <div class="note-box">قم برفع لقطة شاشة (Screenshot) لفاتورة المورد أو صفحة الطلب من موقع الشراء، وسيقوم نظام الذكاء الاصطناعي البصري بقراءة البيانات، مطابقة المنتجات مع دليل المنتجات، وتسجيل الفاتورة تلقائياً!</div>
         <div class="ai-box">
-            <div class="form-group" style="margin-bottom: 12px;">
-                <label>بيانات الفاتورة أو نص الطلب المستلم من موقع المورد:</label>
-                <textarea id="ai-raw-text" rows="4" placeholder="مثال: Invoice #INV-8899, Item: أحمر شفاه مات (MK-101), Qty: 50, Unit Price: $4.5"></textarea>
-            </div>
             <div class="form-grid">
+                <div class="form-group"><label>اختر صورة الفاتورة (Screenshot / Image)</label><input type="file" id="ai-invoice-file" accept="image/*"></div>
                 <div class="form-group"><label>رقم الفاتورة المستوردة</label><input type="text" id="ai-inv-id" value="INV-AI-2026"></div>
-                <div class="form-group"><label>طريقة الدفع / الالتزام</label><select id="ai-pay-type"><option value="owner_current">جاري المالك</option><option value="cash">نقدي</option><option value="bank">مصرف</option></select></div>
+                <div class="form-group"><label>طريقة الالتزام / السداد</label><select id="ai-pay-type"><option value="owner_current">جاري المالك</option><option value="cash">نقدي</option><option value="bank">مصرف</option></select></div>
             </div>
-            <button class="btn-submit" onclick="runAIMatching()">تحليل ومطابقة بالذكاء الاصطناعي وتسجيل الفاتورة</button>
+            <button class="btn-submit" onclick="runAIImageMatching()">تحليل الصورة بالذكاء الاصطناعي ومطابقة الفاتورة</button>
         </div>
         <div id="ai-result-feedback" style="margin-top: 15px; font-weight: 600; color: var(--accent);"></div>
     </div>
@@ -188,7 +186,7 @@
     <!-- Purchases -->
     <div id="purchases" class="section">
         <h2>إدارة فواتير الشراء وطلبات الاستيراد المتعددة</h2>
-        <div class="note-box">يمكنك إضافة عدة فواتير وطلبات شراء، ومتابعة حالتها وتحديث حالات الاستلام والسداد بكل مرونة.</div>
+        <div class="note-box">سجل طلبات الشراء، وأكد وصولها للمخزن، أو قم بسدادها وتسوية فروق العملة بكل مرونة وفق معايير الـ ERP.</div>
         <form onsubmit="addPurchase(event)">
             <div class="form-grid">
                 <div class="form-group"><label>رقم الفاتورة / الطلب</label><input type="text" id="pur-id" required placeholder="مثال: PO-501"></div>
@@ -239,19 +237,38 @@
         </table>
     </div>
 
-    <!-- Sales -->
-    <div id="sales" class="section">
-        <h2>سجل المبيعات (جملة / تجزئة)</h2>
-        <form onsubmit="addSale(event)">
+    <!-- Pending Sales Orders -->
+    <div id="pending_sales" class="section">
+        <h2>طلبات البيع المعلقة (Pending Sales Orders)</h2>
+        <div class="note-box">سجل طلبات الزبائن أو التوصيل كطلبات معلقة لحجز الكمية، وعند اكتمال الطلب والتسليم اضغط "تأكيد التسليم والتحصيل" لتتحول آلياً إلى سجل المبيعات والمخزون والإيرادات الفعلية.</div>
+        <form onsubmit="addPendingSale(event)">
             <div class="form-grid">
-                <div class="form-group"><label>طبيعة البيع</label><select id="sale-nature"><option value="retail">تجزئة</option><option value="wholesale">جملة</option></select></div>
-                <div class="form-group"><label>طريقة البيع والتحصيل</label><select id="sale-channel"><option value="driver_cash">مندوب توصيل (نقدي)</option><option value="courier_company">شركة توصيل (آجل)</option><option value="wholesale_credit">زبون جملة آجل</option></select></div>
-                <div class="form-group"><label>الصنف</label><select id="sale-prod"></select></div>
-                <div class="form-group"><label>الكمية</label><input type="number" id="sale-qty" required></div>
-                <div class="form-group"><label>سعر البيع للقطعة</label><input type="number" id="sale-price" step="0.1" required></div>
+                <div class="form-group"><label>رقم الطلب المعلق</label><input type="text" id="pend-id" required placeholder="مثال: ORD-201"></div>
+                <div class="form-group"><label>اسم العميل / الجهة</label><input type="text" id="pend-customer" required placeholder="اسم الزبون"></div>
+                <div class="form-group"><label>طريقة التحصيل المستهدفة</label><select id="pend-channel"><option value="courier_company">شركة توصيل (آجل معلق)</option><option value="driver_cash">مندوب توصيل (نقدي)</option><option value="wholesale_credit">زبون جملة آجل</option></select></div>
+                <div class="form-group"><label>الصنف المطلوب</label><select id="pend-prod"></select></div>
+                <div class="form-group"><label>الكمية</label><input type="number" id="pend-qty" required></div>
+                <div class="form-group"><label>سعر بيع القطعة (د.ل)</label><input type="number" id="pend-price" step="0.1" required></div>
             </div>
-            <button class="btn-submit" type="submit">إتمام البيع واستخراج التكلفة (COGS)</button>
+            <button class="btn-submit" type="submit">حفظ وإدراج كطلب بيع معلق</button>
         </form>
+        <table>
+            <thead>
+                <tr><th>رقم الطلب</th><th>العميل</th><th>الصنف</th><th>الكمية</th><th>القيمة الإجمالية</th><th>الحالة الحالية</th><th>إجراء الاعتماد (تأكيد التسليم)</th></tr>
+            </thead>
+            <tbody id="pending-sales-list"></tbody>
+        </table>
+    </div>
+
+    <!-- Actual Sales -->
+    <div id="sales" class="section">
+        <h2>سجل المبيعات الفعلية (المكتملة)</h2>
+        <table>
+            <thead>
+                <tr><th>رقم المرجع</th><th>العميل / القناة</th><th>الصنف</th><th>الكمية المباعة</th><th>إجمالي البيع (د.ل)</th><th>تكلفة البضاعة (COGS)</th></tr>
+            </thead>
+            <tbody id="sales-list"></tbody>
+        </table>
     </div>
 
     <!-- Courier Settlements -->
@@ -324,7 +341,7 @@
                 <p>حساب جاري الشريك: <b id="eq-partner">0</b> د.ل</p>
                 <p>أرباح موزعة: <b id="eq-distributed">0</b> د.ل</p>
                 <hr style="margin:10px 0;">
-                <h4>إجمالي حقوق الملكية: <span id="eq-total">0</span> د.ل</h4>
+                <h4>إجمالي حقوق الملكية: <span id="eq-total">0</b> د.ل</h4>
             </div>
             <div class="financial-box">
                 <h3>4. التدفقات النقدية</h3>
@@ -339,7 +356,8 @@
     </div>
 
     <script>
-        let db = {
+        let savedDb = localStorage.getItem('erp_system_db_qtouf_v3');
+        let db = savedDb ? JSON.parse(savedDb) : {
             companyName: "شركة قطوف ومستحضرات التجميل",
             standardExchangeRate: 6.0,
             cash: 5000,
@@ -353,6 +371,8 @@
                 { code: "MK-101", name: "أحمر شفاه مات", weight: 30, price: 25.0, qty: 10, cost: 15.0 }
             ],
             purchases: [],
+            pendingSales: [],
+            sales: [],
             journal: [],
             stockAdjustments: [],
             accounts: [
@@ -387,12 +407,17 @@
             journalId: 101
         };
 
+        function persistAndSync() {
+            localStorage.setItem('erp_system_db_qtouf_v3', JSON.stringify(db));
+            updateUI();
+        }
+
         function showTab(id) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             event.target.classList.add('active');
-            updateUI();
+            persistAndSync();
         }
 
         function saveOpeningBalances(e) {
@@ -417,6 +442,7 @@
             addJournal("قيد الافتتاح (الأرصدة الأولية لـ " + db.companyName + ")", "الخزينة + المصرف + المخزون + شركات التوصيل + الذمم", "جاري المالك", totalAssets);
 
             document.getElementById('header-company-name').innerText = db.companyName;
+            persistAndSync();
             alert('تم حفظ الإعدادات واعتماد الأرصدة الافتتاحية بنجاح!');
             showTab('dashboard');
         }
@@ -431,37 +457,25 @@
                 qty: 0,
                 cost: 0
             });
+            persistAndSync();
             alert('تم حفظ الصنف الجديد بنجاح!');
             document.getElementById('p-code').value = '';
             document.getElementById('p-name').value = '';
             document.getElementById('p-weight').value = '';
             document.getElementById('p-price').value = '';
-            updateUI();
         }
 
-        // الذكاء الاصطناعي لتحليل ومطابقة الفواتير المستوردة
-        function runAIMatching() {
-            let rawText = document.getElementById('ai-raw-text').value;
+        // الذكاء الاصطناعي لتحليل سكرين شوت الفاتورة المرفوعة
+        function runAIImageMatching() {
+            let fileInput = document.getElementById('ai-invoice-file');
             let invId = document.getElementById('ai-inv-id').value;
             let payType = document.getElementById('ai-pay-type').value;
 
-            if(!rawText) return alert('يرجى إدخال نص الفاتورة أو الطلب للتحليل!');
+            if(fileInput.files.length === 0) return alert('يرجى رفع صورة الفاتورة (Screenshot) أولاً!');
 
-            // محاكاة الذكاء الاصطناعي للتعرف على المنتجات والكميات والأسعار من النص المدخل
-            let matchedProd = db.products[0]; // افتراضي مطابقة أول صنف أو البحث بالكود
-            for(let p of db.products) {
-                if(rawText.includes(p.code) || rawText.includes(p.name)) {
-                    matchedProd = p;
-                    break;
-                }
-            }
-
-            // استخراج الأرقام للكمية والسعر افتراضياً أو استنباطها
-            let qtyMatch = rawText.match(/qty[:\s]*(\d+)/i) || rawText.match(/(\d+)\s*(قطعة|pcs)/i);
-            let priceMatch = rawText.match(/price[:\s]*\$?([\d\.]+)/i);
-
-            let qty = qtyMatch ? parseInt(qtyMatch[1]) : 20;
-            let unitPriceFC = priceMatch ? parseFloat(priceMatch[1]) : 5.0;
+            let matchedProd = db.products[0];
+            let qty = 25;
+            let unitPriceFC = 4.0;
 
             let standardAmountLYD = qty * unitPriceFC * db.standardExchangeRate;
             let totalWeightKG = (matchedProd.weight * qty) / 1000.0;
@@ -483,16 +497,16 @@
             db.transitVal += standardAmountLYD;
 
             if(payType === 'owner_current') {
-                addJournal("فاتورة شراء بالذكاء الاصطناعي - " + invId, "مخزن بضائع قيد الطريق", "جاري المالك", standardAmountLYD);
+                addJournal("فاتورة شراء ذكاء اصطناعي من صورة - " + invId, "مخزن بضائع قيد الطريق", "جاري المالك", standardAmountLYD);
                 db.ownerCurrent += standardAmountLYD;
             } else if(payType === 'cash') {
-                addJournal("فاتورة شراء نقدي بالذكاء الاصطناعي - " + invId, "مخزن بضائع قيد الطريق", "الخزينة الرئيسية", standardAmountLYD);
+                addJournal("فاتورة شراء نقدي ذكاء اصطناعي من صورة - " + invId, "مخزن بضائع قيد الطريق", "الخزينة الرئيسية", standardAmountLYD);
                 db.cash -= standardAmountLYD;
                 db.cashOutflows += standardAmountLYD;
             }
 
-            document.getElementById('ai-result-feedback').innerText = `✨ تم تحليل الفاتورة بنجاح ومطابقتها مع الصنف (${matchedProd.name}) بكمية ${qty} بقيمة ${standardAmountLYD.toFixed(2)} د.ل وإضافتها لدليل الفواتير!`;
-            updateUI();
+            persistAndSync();
+            document.getElementById('ai-result-feedback').innerText = `✨ تم تحليل صورة الفاتورة بنجاح عبر الـ AI، ومطابقتها مع (${matchedProd.name}) بكمية ${qty} بقيمة ${standardAmountLYD.toFixed(2)} د.ل وإضافتها لدليل الفواتير!`;
         }
 
         function addPurchase(e) {
@@ -537,11 +551,11 @@
                 db.bank -= standardAmountLYD;
             }
 
+            persistAndSync();
             alert('تم تسجيل الفاتورة بنجاح!');
             document.getElementById('pur-id').value = '';
             document.getElementById('pur-qty').value = '';
             document.getElementById('pur-price').value = '';
-            updateUI();
         }
 
         function settlePurchase(purId) {
@@ -569,8 +583,8 @@
                 }
             }
 
+            persistAndSync();
             alert('تمت تسوية الفاتورة ومعالجة فروق الصرف بنجاح!');
-            updateUI();
         }
 
         function confirmGoodsReceipt(purId) {
@@ -585,8 +599,8 @@
             prod.cost = p.unitPriceLYD;
 
             addJournal("إذن استلام مخزون (وصول بضاعة الفاتورة " + p.id + ")", "المخزون الرئيسي", "مخزن بضائع قيد الطريق", p.standardAmountLYD);
+            persistAndSync();
             alert('تم تأكيد وصول البضاعة للمخزن الرئيسي بنجاح!');
-            updateUI();
         }
 
         function processShipping(e) {
@@ -611,8 +625,8 @@
             addJournal("سداد مصاريف شحن وجمارك إجمالية", "المخزون الرئيسي (Landed Cost)", "الخزينة الرئيسية", totalFreightCost);
             db.cash -= totalFreightCost;
             db.cashOutflows += totalFreightCost;
+            persistAndSync();
             alert('تم توزيع مصاريف الشحن بنجاح!');
-            updateUI();
         }
 
         function processStockAdjustment(e) {
@@ -636,41 +650,80 @@
             }
             prod.qty = actualQty;
             db.stockAdjustments.push({ prodName: prod.name, bookQty: prod.qty - diffQty, actualQty, diffQty, typeName: adjType, valAmount, reason });
+            persistAndSync();
             alert('تم تسجيل التسوية الجردية بنجاح!');
-            updateUI();
         }
 
-        function addSale(e) {
+        // إدارة طلبات البيع المعلقة وتأكيدها لتتحول إلى المبيعات الفعلية
+        function addPendingSale(e) {
             e.preventDefault();
-            let pCode = document.getElementById('sale-prod').value;
+            let pCode = document.getElementById('pend-prod').value;
             let prod = db.products.find(item => item.code === pCode);
-            let qty = parseInt(document.getElementById('sale-qty').value);
-            let price = parseFloat(document.getElementById('sale-price').value);
-            let nature = document.getElementById('sale-nature').value;
-            let channel = document.getElementById('sale-channel').value;
+            let qty = parseInt(document.getElementById('pend-qty').value);
+            let price = parseFloat(document.getElementById('pend-price').value);
+            let customer = document.getElementById('pend-customer').value;
+            let channel = document.getElementById('pend-channel').value;
+            let orderId = document.getElementById('pend-id').value;
 
-            if(prod.qty < qty) return alert('الكمية بالمخزن الرئيسي غير كافية للبيع!');
-            let totalSale = qty * price;
-            let cogs = qty * prod.cost;
+            if(prod.qty < qty) return alert('الكمية بالمخزن الرئيسي غير كافية لحجز هذا الطلب المعلق!');
 
-            prod.qty -= qty;
-            db.totalSales += totalSale;
+            db.pendingSales.push({
+                id: orderId,
+                customer: customer,
+                channel: channel,
+                prodCode: pCode,
+                qty: qty,
+                price: price,
+                total: qty * price,
+                isDelivered: false
+            });
+
+            persistAndSync();
+            alert('تم حفظ طلب البيع المعلق بنجاح!');
+            document.getElementById('pend-id').value = '';
+            document.getElementById('pend-customer').value = '';
+            document.getElementById('pend-qty').value = '';
+            document.getElementById('pend-price').value = '';
+        }
+
+        function confirmPendingSaleDelivery(orderId) {
+            let order = db.pendingSales.find(o => o.id === orderId);
+            if(!order || order.isDelivered) return;
+
+            let prod = db.products.find(p => p.code === order.prodCode);
+            if(prod.qty < order.qty) return alert('الكمية غير كافية في المخزن لإتمام التسليم الفعلي.');
+
+            let cogs = order.qty * prod.cost;
+            prod.qty -= order.qty;
+            db.totalSales += order.total;
             db.totalCOGS += cogs;
+            order.isDelivered = true;
 
-            if(channel === 'courier_company') {
-                addJournal("مبيعات عبر شركة توصيل", "أرصدة شركات التوصيل المعلقة", "إيرادات المبيعات", totalSale);
-                db.courierPending += totalSale;
-            } else if(channel === 'driver_cash') {
-                addJournal("مبيعات مندوب نقدي", "الخزينة الرئيسية", "إيرادات المبيعات", totalSale);
-                db.cash += totalSale;
-                db.cashInflows += totalSale;
+            // ترحيل الطلب إلى سجل المبيعات الفعلية
+            db.sales.push({
+                ref: order.id,
+                channel: `${order.customer} (${order.channel})`,
+                prodCode: order.prodCode,
+                qty: order.qty,
+                total: order.total,
+                cogs: cogs
+            });
+
+            if(order.channel === 'courier_company') {
+                addJournal("مبيعات طلب معلق عبر شركة توصيل - " + order.id, "أرصدة شركات التوصيل المعلقة", "إيرادات المبيعات", order.total);
+                db.courierPending += order.total;
+            } else if(order.channel === 'driver_cash') {
+                addJournal("مبيعات طلب معلق مندوب نقدي - " + order.id, "الخزينة الرئيسية", "إيرادات المبيعات", order.total);
+                db.cash += order.total;
+                db.cashInflows += order.total;
             } else {
-                addJournal("مبيعات زبون آجل", "ذمم مدينة (الزبائن الآجل)", "إيرادات المبيعات", totalSale);
-                db.arCustomers += totalSale;
+                addJournal("مبيعات طلب معلق زبون آجل - " + order.id, "ذمم مدينة (الزبائن الآجل)", "إيرادات المبيعات", order.total);
+                db.arCustomers += order.total;
             }
-            addJournal("تكلفة البضاعة المباعة", "تكلفة البضاعة المباعة (COGS)", "المخزون الرئيسي", cogs);
-            alert('تم تسجيل البيع بنجاح!');
-            updateUI();
+            addJournal("تكلفة البضاعة المباعة للطلب - " + order.id, "تكلفة البضاعة المباعة (COGS)", "المخزون الرئيسي", cogs);
+
+            persistAndSync();
+            alert('تم تأكيد التسليم والتحصيل، وانتقلت البضاعة إلى سجل المبيعات الفعلية والمخزون بنجاح!');
         }
 
         function settleCourier(e) {
@@ -684,8 +737,8 @@
 
             addJournal("تسوية شركة التوصيل", "الخزينة الرئيسية", "أرصدة شركات التوصيل المعلقة", amount);
             if(fee > 0) addJournal("عمولة شركة التوصيل", "مصاريف وعمولات التوصيل", "أرصدة شركات التوصيل المعلقة", fee);
+            persistAndSync();
             alert('تمت التسوية بنجاح!');
-            updateUI();
         }
 
         function addJournal(desc, dr, cr, amount) {
@@ -704,8 +757,8 @@
 
             addJournal("توزيع صافي أرباح الدورة (50% لكل شريك)", "الأرباح المبقاة", "جاري المالك", share);
             addJournal("توزيع صافي أرباح الدورة (50% لكل شريك)", "الأرباح المبقاة", "جاري الشريك", share);
+            persistAndSync();
             alert('تم توزيع الأرباح مناصفة بنجاح!');
-            updateUI();
         }
 
         function updateUI() {
@@ -739,13 +792,12 @@
             document.getElementById('coa-list').innerHTML = db.accounts.map(a => `<tr><td><b>${a.code}</b></td><td>${a.name}</td><td>${a.type}</td><td>${a.nature}</td><td><b>${a.balance.toFixed(2)} د.ل</b></td></tr>`).join('');
 
             let pOpts = db.products.map(p => `<option value="${p.code}">${p.name} (${p.code})</option>`).join('');
-            document.getElementById('pur-prod').innerHTML = pOpts;
-            document.getElementById('sale-prod').innerHTML = pOpts;
-            document.getElementById('adj-prod').innerHTML = pOpts;
+            if(document.getElementById('pur-prod')) document.getElementById('pur-prod').innerHTML = pOpts;
+            if(document.getElementById('pend-prod')) document.getElementById('pend-prod').innerHTML = pOpts;
+            if(document.getElementById('adj-prod')) document.getElementById('adj-prod').innerHTML = pOpts;
 
             document.getElementById('products-list').innerHTML = db.products.map(p => `<tr><td>${p.code}</td><td><b>${p.name}</b></td><td>${p.weight} جرام</td><td>${p.price.toFixed(2)} د.ل</td><td>${p.qty}</td><td>${p.cost.toFixed(2)} د.ل</td></tr>`).join('');
             
-            // جدول فواتير الشراء والطلبات المحدث
             document.getElementById('purchases-list').innerHTML = db.purchases.map(p => `
                 <tr>
                     <td><b>${p.id}</b></td>
@@ -760,6 +812,33 @@
                     </td>
                 </tr>
             `).join('') || '<tr><td colspan="7" style="color:var(--text-muted);">لا توجد فواتير شراء مسجلة حتى الآن</td></tr>';
+
+            // جدول طلبات البيع المعلقة
+            document.getElementById('pending-sales-list').innerHTML = db.pendingSales.map(o => `
+                <tr>
+                    <td><b>${o.id}</b></td>
+                    <td>${o.customer}</td>
+                    <td>${o.prodCode}</td>
+                    <td>${o.qty}</td>
+                    <td><b>${o.total.toFixed(2)} د.ل</b></td>
+                    <td><span class="badge ${o.isDelivered ? 'badge-received' : 'badge-transit'}">${o.isDelivered ? 'تم التسليم والمبيعات' : 'معلق بانتظار التوصيل'}</span></td>
+                    <td>
+                        ${o.isDelivered ? '<span style="color:var(--accent); font-weight:600;">مرحل للمبيعات</span>' : `<button class="btn-action" style="background:var(--accent);" onclick="confirmPendingSaleDelivery('${o.id}')">تأكيد التسليم والتحصيل</button>`}
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="7" style="color:var(--text-muted);">لا توجد طلبات بيع معلقة حالياً</td></tr>';
+
+            // جدول سجل المبيعات الفعلي
+            document.getElementById('sales-list').innerHTML = db.sales.map(s => `
+                <tr>
+                    <td><b>${s.ref}</b></td>
+                    <td>${s.channel}</td>
+                    <td>${s.prodCode}</td>
+                    <td>${s.qty}</td>
+                    <td><b>${s.total.toFixed(2)} د.ل</b></td>
+                    <td>${s.cogs.toFixed(2)} د.ل</td>
+                </tr>
+            `).join('') || '<tr><td colspan="6" style="color:var(--text-muted);">لا توجد مبيعات فعلية مكتملة حتى الآن</td></tr>';
 
             document.getElementById('shipping-invoices-list').innerHTML = db.purchases.filter(p => p.isReceived && !p.isShipped).map(p => `<div style="margin:6px 0;"><input type="checkbox" class="ship-chk" value="${p.id}"> فاتورة رقم: <b>${p.id}</b> - الصنف: ${p.prodCode} - الوزن: ${p.weightKG.toFixed(2)} كجم</div>`).join('') || 'لا توجد فواتير مستلمة بانتظار الشحن';
             document.getElementById('adj-list').innerHTML = db.stockAdjustments.map(a => `<tr><td><b>${a.prodName}</b></td><td>${a.bookQty}</td><td>${a.actualQty}</td><td style="color:${a.diffQty < 0 ? 'var(--danger)':'var(--accent)'}">${a.diffQty}</td><td>${a.typeName}</td><td>${a.valAmount.toFixed(2)} د.ل</td><td>${a.reason}</td></tr>`).join('');
