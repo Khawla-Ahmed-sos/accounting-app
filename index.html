@@ -1,276 +1,285 @@
-/**
- * نظام المحاسبة المتكامل للشركات (الجرد المستمر والمعايير الدولية IFRS)
- * بلغة JavaScript (Node.js) مع حفظ دائم للبيانات باستخدام SQLite.
- */
+import pandas as pd
 
-const Database = require('better-sqlite3');
-const db = new Database('accounting_system.db');
 
-// ==========================================
-// 0. طبقة قاعدة البيانات للحفظ الدائم
-// ==========================================
-db.exec(`
-    CREATE TABLE IF NOT EXISTS journal_entries (
-        entry_id TEXT PRIMARY KEY,
-        company_id TEXT,
-        description TEXT,
-        date TEXT,
-        is_posted INTEGER
-    );
+class AccountingEngine:
 
-    CREATE TABLE IF NOT EXISTS journal_lines (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        entry_id TEXT,
-        account_code TEXT,
-        account_name TEXT,
-        debit REAL,
-        credit REAL,
-        FOREIGN KEY (entry_id) REFERENCES journal_entries (entry_id)
-    );
-`);
+  def __init__(self, chart_of_accounts):
+    """تهيئة المحرك المحاسبي بدليل الحسابات"""
+    self.coa = chart_of_accounts
+    self.journal_entries = []
 
-// ==========================================
-// 1. دليل الحسابات القياسي
-// ==========================================
-const AccountType = {
-    ASSET: "الأصول",
-    LIABILITY: "الالتزامات",
-    EQUITY: "حقوق الملكية",
-    REVENUE: "الإيرادات",
-    EXPENSE: "المصروفات"
-};
+  def add_journal_entry(self, entry_id, date, entries, description=""):
+    """إضافة قيد محاسبي مع التحقق الصارم من التوازن (المدين = الدائن)"""
+    total_debit = sum(item.get("Debit", 0) for item in entries)
+    total_credit = sum(item.get("Credit", 0) for item in entries)
 
-const DEFAULT_CHART_OF_ACCOUNTS = {
-    "1101": { name: "النقدية بالخزينة (نقدي)", type: AccountType.ASSET },
-    "1102": { name: "البنك / المصرف", type: AccountType.ASSET },
-    "1103": { name: "المدينون (العملاء)", type: AccountType.ASSET },
-    "1104": { name: "مخزون البضاعة (جرد مستمر)", type: AccountType.ASSET },
-    "1105": { name: "بضاعة في الطريق (استيراد/شحن)", type: AccountType.ASSET },
-    "1106": { name: "ذمم شركات الشحن والمندوبين", type: AccountType.ASSET },
-    "2101": { name: "الدائنون (الموردون)", type: AccountType.LIABILITY },
-    "2102": { name: "تأمينات وعرابين مقبوضة", type: AccountType.LIABILITY },
-    "2103": { name: "حساب المقاصة الشريك/التسويات", type: AccountType.LIABILITY },
-    "3101": { name: "رأس المال", type: AccountType.EQUITY },
-    "3102": { name: "جاري المالك / الشركاء", type: AccountType.EQUITY },
-    "4101": { name: "إيرادات المبيعات", type: AccountType.REVENUE },
-    "5101": { name: "تكلفة البضاعة المباعة (COGS)", type: AccountType.EXPENSE },
-    "5102": { name: "مسموحات وتسويات المبيعات", type: AccountType.EXPENSE },
-    "5103": { name: "مصروفات التشغيل والشحن", type: AccountType.EXPENSE }
-};
+    if round(total_debit, 2) != round(total_credit, 2):
+      raise ValueError(
+          f"❌ [خطأ محاسبي]: رفض القيد ({entry_id}) لعدم التوازن! إجمالي المدين"
+          f" ({total_debit:,.2f}) لا يساوي إجمالي الدائن"
+          f" ({total_credit:,.2f})."
+      )
 
-// ==========================================
-// 2. المحرك المحاسبي وتوازن القيود
-// ==========================================
-class JournalEntry {
-    constructor(entryId, companyId, description, date = new Date()) {
-        this.entryId = entryId;
-        this.companyId = companyId;
-        this.description = description;
-        this.date = date;
-        this.lines = [];
-        this.isPosted = false;
-    }
+    for item in entries:
+      self.journal_entries.append({
+          "Entry_ID": entry_id,
+          "Date": date,
+          "Account_ID": item["Account_ID"],
+          "Debit": item.get("Debit", 0.0),
+          "Credit": item.get("Credit", 0.0),
+          "Description": description,
+      })
+    print(
+        f"✅ [ترحيل ناجح]: القيد ({entry_id}) متزن وتم إثباته في دفتر اليومية"
+        f" (المبلغ: {total_debit:,.2f})."
+    )
 
-    addLine(accountCode, accountName, debit = 0.0, credit = 0.0) {
-        this.lines.push({
-            accountCode,
-            accountName,
-            debit: Math.round(debit * 1000) / 1000,
-            credit: Math.round(credit * 1000) / 1000
-        });
-    }
+  def distribute_shipping_cost_by_weight(self, shipments):
+    """زر شامل: توزيع تكلفة الشحن الإجمالية على الفواتير أو البضائع حسب الوزن النسبي
 
-    validateAndPost() {
-        let totalDebit = this.lines.reduce((sum, line) => sum + line.debit, 0);
-        let totalCredit = this.lines.reduce((sum, line) => sum + line.credit, 0);
+    shipments: قائمة قواميس [{ 'Invoice_ID': 'INV-1', 'Weight': 15.5 }, ...]
+    total_shipping_cost: إجمالي فاتورة شركة الشحن أو التخليص
+    """
+    total_weight = sum(s["Weight"] for s in shipments)
+    if total_weight <= 0:
+      raise ValueError("❌ الوزن الإجمالي يجب أن يكون أكبر من الصفر.")
 
-        if (Math.abs(totalDebit - totalCredit) > 0.001) {
-            throw new Error(`فشل ترحيل القيد ${this.entryId}: القيد غير متزن! إجمالي المدين (${totalDebit}) لا يساوي الدائن (${totalCredit}).`);
-        }
-        
-        this.isPosted = true;
-        this.saveToDatabase();
-        return true;
-    }
+    distributed_results = []
+    print("\n--- [توزيع تكلفة الشحن حسب الوزن] ---")
+    for s in shipments:
+      # حصة الفاتورة من الوزن الإجمالي * إجمالي تكلفة الشحن
+      # (يمكن تمرير إجمالي التكلفة كمعامل للدالة)
+      pass
 
-    saveToDatabase() {
-        const insertEntry = db.prepare(`
-            INSERT OR REPLACE INTO journal_entries (entry_id, company_id, description, date, is_posted)
-            VALUES (?, ?, ?, ?, ?)
-        `);
-        const deleteLines = db.prepare(`DELETE FROM journal_lines WHERE entry_id = ?`);
-        const insertLine = db.prepare(`
-            INSERT INTO journal_lines (entry_id, account_code, account_name, debit, credit)
-            VALUES (?, ?, ?, ?, ?)
-        `);
+  def process_purchase_order(
+      self,
+      po_id,
+      date,
+      supplier_id,
+      payment_method_account,
+      items_amount,
+      is_import=False,
+      shipping_cost=0.0,
+  ):
+    """معالجة أمر الشراء (مؤقت: بضاعة في الطريق / استيراد محلي ودولي)"""
+    total_amount = items_amount + shipping_cost
+    entries = [{"Account_ID": 1107, "Debit": total_amount, "Credit": 0.0}]  # بضاعة في الطريق (تكلفة رأسمالية)
 
-        const transaction = db.transaction((entry) => {
-            insertEntry.run(entry.entryId, entry.companyId, entry.description, entry.date.toISOString(), entry.isPosted ? 1 : 0);
-            deleteLines.run(entry.entryId);
-            for (let line of entry.lines) {
-                insertLine.run(entry.entryId, line.accountCode, line.accountName, line.debit, line.credit);
-            }
-        });
+    if is_import and shipping_cost > 0:
+      # إثبات مصاريف الشحن الدولي ضمن الاعتماد أو بضاعة في الطريق
+      entries.append(
+          {"Account_ID": 1108, "Debit": shipping_cost, "Credit": 0.0}
+      )
 
-        transaction(this);
-    }
-}
+    # طريقة الدفع (نقدي 1101، مصرف 1102، دائنون/موردون 2101، جاري المالك 2104)
+    entries.append(
+        {"Account_ID": payment_method_account, "Debit": 0.0, "Credit": total_amount}
+    )
 
-// ==========================================
-// 3. إدارة أوامر الشراء والمبيعات
-// ==========================================
-class PurchaseManager {
-    static createPurchaseOrder(entryId, companyId, purchaseType, paymentMethod, amount) {
-        let entry = new JournalEntry(entryId, companyId, `أمر شراء (${purchaseType}) - الدفع: ${paymentMethod}`);
-        
-        let targetCode = purchaseType === "محلي" ? "1104" : "1105";
-        let targetName = purchaseType === "محلي" ? "مخزون البضاعة (جرد مستمر)" : "بضاعة في الطريق (استيراد/شحن)";
+    self.add_journal_entry(
+        entry_id=po_id,
+        date=date,
+        entries=entries,
+        description="إصدار أمر شراء - بضاعة في الطريق",
+    )
 
-        let paymentMap = {
-            "نقدي": ["1101", "النقدية بالخزينة (نقدي)"],
-            "مصرف": ["1102", "البنك / المصرف"],
-            "دائنون": ["2101", "الدائنون (الموردون)"],
-            "جاري المالك": ["3102", "جاري المالك / الشركاء"]
-        };
-        let [payCode, payName] = paymentMap[paymentMethod];
+  def receive_goods_and_settle(self, receipt_id, date, amount):
+    """زر: تم التسليم وتم التسوية (نقل من بضاعة في الطريق إلى المخزون الفعلي)"""
+    entries = [
+        {"Account_ID": 1106, "Debit": amount, "Credit": 0.0},  # المخزون الفعلي
+        {"Account_ID": 1107, "Debit": 0.0, "Credit": amount},  # إغلاق بضاعة في الطريق
+    ]
+    self.add_journal_entry(
+        entry_id=receipt_id,
+        date=date,
+        entries=entries,
+        description="استلام البضاعة وتسوية المخزون (جرد مستمر)",
+    )
 
-        entry.addLine(targetCode, targetName, amount, 0.0);
-        entry.addLine(payCode, payName, 0.0, amount);
-        
-        entry.validateAndPost();
-        return entry;
-    }
+  def process_sales_order(
+      self,
+      so_id,
+      date,
+      sales_amount,
+      cogs_amount,
+      payment_or_receivable_account,
+      is_booking=False,
+  ):
+    """معالجة أمر البيع وتسليم القيمة وتكلفة البضاعة المباعة آلياً (الجرد المستمر)"""
+    # 1. قيد الإيراد أو العربون
+    revenue_account_target = (
+        2102 if is_booking else 4101
+    )  # 2102 مقدمات عملاء / 4101 إيراد مبيعات
+    sales_entries = [
+        {"Account_ID": payment_or_receivable_account, "Debit": sales_amount, "Credit": 0.0},
+        {"Account_ID": revenue_account_target, "Debit": 0.0, "Credit": sales_amount},
+    ]
+    self.add_journal_entry(
+        entry_id=so_id,
+        date=date,
+        entries=sales_entries,
+        description="إثبات طلب البيع / الإيراد",
+    )
 
-    static settleImportedGoods(entryId, companyId, amount) {
-        let entry = new JournalEntry(entryId, companyId, "تسوية بضاعة في الطريق إلى المخزون الرئيسي");
-        entry.addLine("1104", "مخزون البضاعة (جرد مستمر)", amount, 0.0);
-        entry.addLine("1105", "بضاعة في الطريق (استيراد/شحن)", 0.0, amount);
-        entry.validateAndPost();
-        return entry;
-    }
-}
+    # 2. قيد تكلفة البضاعة المباعة (المخزون يتحرك آلياً في الجرد المستمر)
+    cogs_entries = [
+        {"Account_ID": 5101, "Debit": cogs_amount, "Credit": 0.0},  # تكلفة البضاعة المباعة
+        {"Account_ID": 1106, "Debit": 0.0, "Credit": cogs_amount},  # تخفيض المخزون الفعلي
+    ]
+    self.add_journal_entry(
+        entry_id=f"COGS-{so_id}",
+        date=date,
+        entries=cogs_entries,
+        description="إثبات تكلفة البضاعة المباعة (جرد مستمر)",
+    )
 
-class SalesManager {
-    static createSalesOrder(entryId, companyId, paymentMethod, receiptType, orderStatus, collector, saleAmount, costAmount, advancePaid = 0.0) {
-        let entries = [];
-        let salesEntry = new JournalEntry(entryId, companyId, `أمر بيع (${orderStatus}) - تحصيل: ${collector}`);
+  def generate_trial_balance(self):
+    """إنشاء ميزان المراجعة"""
+    if not self.journal_entries:
+      return pd.DataFrame()
 
-        let debitCode, debitName;
-        if (["شركات الشحن", "مندوبي الشركة"].includes(collector)) {
-            debitCode = "1106";
-            debitName = `ذمم ${collector}`;
-        } else {
-            let paymentMap = {
-                "نقدي": ["1101", "النقدية بالخزينة (نقدي)"],
-                "مصرف": ["1102", "البنك / المصرف"],
-                "مدينون": ["1103", "المدينون (العملاء)"],
-                "مقاصة": ["2103", "حساب المقاصة الشريك/التسويات"]
-            };
-            [debitCode, debitName] = paymentMap[paymentMethod];
-        }
+    df_je = pd.DataFrame(self.journal_entries)
+    tb = df_je.groupby("Account_ID")[["Debit", "Credit"]].sum().reset_index()
+    tb = pd.merge(tb, self.coa, on="Account_ID", how="left")
 
-        if (receiptType === "كامل") {
-            salesEntry.addLine(debitCode, debitName, saleAmount, 0.0);
-            salesEntry.addLine("4101", "إيرادات المبيعات", 0.0, saleAmount);
-        } else if (["جزئي", "عربون"].includes(receiptType)) {
-            let remaining = saleAmount - advancePaid;
-            if (advancePaid > 0) salesEntry.addLine(debitCode, debitName, advancePaid, 0.0);
-            if (remaining > 0) salesEntry.addLine("1103", "المدينون (العملاء)", remaining, 0.0);
-            salesEntry.addLine("4101", "إيرادات المبيعات", 0.0, saleAmount);
-        }
+    tb["Net_Debit"] = tb.apply(
+        lambda r: (
+            r["Debit"] - r["Credit"] if r["Debit"] > r["Credit"] else 0.0
+        ),
+        axis=1,
+    )
+    tb["Net_Credit"] = tb.apply(
+        lambda r: (
+            r["Credit"] - r["Debit"] if r["Credit"] > r["Debit"] else 0.0
+        ),
+        axis=1,
+    )
+    return tb[[
+        "Account_ID",
+        "Account_Name",
+        "Account_Type",
+        "Net_Debit",
+        "Net_Credit",
+    ]]
 
-        salesEntry.validateAndPost();
-        entries.push(salesEntry);
+  def generate_income_statement(self, trial_balance):
+    """توليد قائمة الدخل"""
+    rev_df = trial_balance[trial_balance["Account_Type"] == "Revenue"]
+    exp_df = trial_balance[trial_balance["Account_Type"] == "Expense"]
 
-        // قيد تكلفة البضاعة المباعة (جرد مستمر)
-        let cogsEntry = new JournalEntry(`${entryId}-COGS`, companyId, "إثبات تكلفة البضاعة المباعة آلياً (جرد مستمر)");
-        cogsEntry.addLine("5101", "تكلفة البضاعة المباعة (COGS)", costAmount, 0.0);
-        cogsEntry.addLine("1104", "مخزون البضاعة (جرد مستمر)", 0.0, costAmount);
-        cogsEntry.validateAndPost();
-        entries.push(cogsEntry);
+    total_revenue = rev_df["Net_Credit"].sum() - rev_df["Net_Debit"].sum()
+    total_expense = exp_df["Net_Debit"].sum() - exp_df["Net_Credit"].sum()
+    net_income = total_revenue - total_expense
 
-        return entries;
-    }
+    print("\n" + "=" * 50)
+    print("                 قائمة الدخل (Income Statement)                 ")
+    print("=" * 50)
+    print(f"إجمالي الإيرادات: {total_revenue:,.2f}")
+    print(f"إجمالي المصروفات وتكلفة البضاعة المباعة: {total_expense:,.2f}")
+    print("-" * 50)
+    print(f"صافي الدخل (الربح / الخسارة): {net_income:,.2f}")
+    print("=" * 50)
+    return net_income
 
-    static createSalesAdjustment(entryId, companyId, adjustmentAmount, reason) {
-        let entry = new JournalEntry(entryId, companyId, `تسويات مبيعات: ${reason}`);
-        entry.addLine("5102", "مسموحات وتسويات المبيعات", adjustmentAmount, 0.0);
-        entry.addLine("1103", "المدينون (العملاء)", 0.0, adjustmentAmount);
-        entry.validateAndPost();
-        return entry;
-    }
-}
 
-// ==========================================
-// 4. النظام المحاسبي وإصدار التقارير
-// ==========================================
-class AccountingSystem {
-    constructor(companyId) {
-        this.companyId = companyId;
-    }
+# ==========================================
+# دالة إضافية مخصصة: زر توزيع تكلفة الشحن حسب الوزن
+# ==========================================
+def allocate_shipping_by_weight(invoices_weights, total_shipping_cost):
+  """توزيع تكلفة الشحن الإجالية على الفواتير تناسبياً حسب الوزن
 
-    getJournalLedger() {
-        const stmt = db.prepare(`SELECT entry_id, description, date, is_posted FROM journal_entries WHERE company_id = ?`);
-        const entriesRows = stmt.all(this.companyId);
-        
-        let entries = [];
-        for (let row of entriesRows) {
-            let entry = new JournalEntry(row.entry_id, this.companyId, row.description, new Date(row.date));
-            entry.isPosted = Boolean(row.is_posted);
-            
-            const lineStmt = db.prepare(`SELECT account_code, account_name, debit, credit FROM journal_lines WHERE entry_id = ?`);
-            let linesRows = lineStmt.all(row.entry_id);
-            for (let l of linesRows) {
-                entry.addLine(l.account_code, l.account_name, l.debit, l.credit);
-            }
-            entries.push(entry);
-        }
-        return entries;
-    }
+  invoices_weights: قائمة قواميس [{ 'Invoice_ID': 'INV-01', 'Weight': 10 }, ...]
+  total_shipping_cost: إجمالي فاتورة الشحن المراد توزيعها
+  """
+  total_weight = sum(item["Weight"] for item in invoices_weights)
+  if total_weight <= 0:
+    raise ValueError("الوزن الإجمالي يجب أن يكون أكبر من الصفر لتوزيع الشحن.")
 
-    postOpeningBalance(balances) {
-        let entry = new JournalEntry("OPENING-001", this.companyId, "القيد الافتتاحي للشركة");
-        for (let [accCode, val] of Object.entries(balances)) {
-            let accName = DEFAULT_CHART_OF_ACCOUNTS[accCode] ? DEFAULT_CHART_OF_ACCOUNTS[accCode].name : "حساب غير معرف";
-            entry.addLine(accCode, accName, val.debit || 0.0, val.credit || 0.0);
-        }
-        entry.validateAndPost();
-        return entry;
-    }
+  allocation_results = []
+  print(
+      "\n📦 --- [توزيع تكلفة الشحن على الفواتير حسب الوزن النسبي] --- 📦"
+  )
+  print(f"إجمالي تكلفة الشحن المراد توزيعها: {total_shipping_cost:,.2f}")
+  print(f"إجمالي الوزن الكلي: {total_weight:,.2f} كغ\n")
 
-    generateAmericanJournal() {
-        console.log(`\n==================== دفتر اليومية الأمريكية - الشركة: ${this.companyId} ====================`);
-        let entries = this.getJournalLedger();
-        for (let entry of entries) {
-            for (let line of entry.lines) {
-                console.log(`[${entry.entryId}] | ${entry.description} | الحساب: ${line.accountName} | مدين: ${line.debit} | دائن: ${line.credit}`);
-            }
-        }
-        console.log("==========================================================================");
-    }
-}
+  for item in invoices_weights:
+    weight_ratio = item["Weight"] / total_weight
+    allocated_cost = total_shipping_cost * weight_ratio
+    allocation_results.append({
+        "Invoice_ID": item["Invoice_ID"],
+        "Weight": item["Weight"],
+        "Ratio": weight_ratio * 100,
+        "Allocated_Shipping_Cost": round(allocated_cost, 2),
+    })
+    print(
+        f"• الفاتورة ({item['Invoice_ID']}) - الوزن: {item['Weight']} كغ"
+        f" ({weight_ratio*100:.1f}%) ──► حصتها من الشحن:"
+        f" {allocated_cost:,.2f} د.ل"
+    )
 
-// ==========================================
-// 5. تجربة وتشغيل المنظومة
-// ==========================================
-try {
-    const company = new AccountingSystem("CORP-JS-2026");
-    
-    // إنشاء القيد الافتتاحي
-    company.postOpeningBalance({
-        "1101": { debit: 150000.0, credit: 0.0 },
-        "3101": { debit: 0.0, credit: 150000.0 }
-    });
+  print("=" * 60)
+  return pd.DataFrame(allocation_results)
 
-    // أوامر الشراء والبيع والتسويات
-    PurchaseManager.createPurchaseOrder("PO-JS-1", "CORP-JS-2026", "استيراد", "مصرف", 40000.0);
-    PurchaseManager.settleImportedGoods("SETTLE-JS-1", "CORP-JS-2026", 40000.0);
-    SalesManager.createSalesOrder("SO-JS-1", "CORP-JS-2026", "نقدي", "عربون", "فوري", "شركات الشحن", 25000.0, 15000.0, 5000.0);
-    SalesManager.createSalesAdjustment("ADJ-JS-1", "CORP-JS-2026", 300.0, "مسموحات مبيعات");
 
-    console.log("[+] تمت عمليات الحفظ الدائم واستخراج اليومية بنجاح عبر JavaScript!");
-    company.generateAmericanJournal();
+# ==========================================
+# تجربة وتثبيت النظام المتكامل
+# ==========================================
+if __name__ == "__main__":
+  # 1. دليل الحسابات الشامل
+  coa_df = pd.DataFrame([
+      {"Account_ID": 1101, "Account_Name": "النقدية بالخزينة", "Account_Type": "Asset"},
+      {"Account_ID": 1102, "Account_Name": "المصرف (البنوك)", "Account_Type": "Asset"},
+      {"Account_ID": 1106, "Account_Name": "المخزون (جرد مستمر)", "Account_Type": "Asset"},
+      {"Account_ID": 1107, "Account_Name": "بضاعة في الطريق", "Account_Type": "Asset"},
+      {"Account_ID": 1108, "Account_Name": "مصاريف الاستيراد والشحن", "Account_Type": "Asset"},
+      {"Account_ID": 2101, "Account_Name": "الموردون (دائنون)", "Account_Type": "Liability"},
+      {"Account_ID": 2102, "Account_Name": "مقدمات وعربون العملاء", "Account_Type": "Liability"},
+      {"Account_ID": 2104, "Account_Name": "جاري المالك", "Account_Type": "Liability"},
+      {"Account_ID": 4101, "Account_Name": "إيراد المبيعات", "Account_Type": "Revenue"},
+      {"Account_ID": 5101, "Account_Name": "تكلفة البضاعة المباعة", "Account_Type": "Expense"},
+  ])
 
-} catch (error) {
-    console.error("خطأ في النظام المحاسبي:", error.message);
-}
+  app = AccountingEngine(coa_df)
+
+  # 2. اختبار أمر شراء دولي/استيراد مع شحن
+  app.process_purchase_order(
+      po_id="PO-IMP-2026-01",
+      date="2026-05-01",
+      supplier_id="SUP-GLOBAL",
+      payment_method_account=2101,  # دائنون (موردون)
+      items_amount=10000.0,
+      is_import=True,
+      shipping_cost=1500.0,
+  )
+
+  # 3. اختبار زر "تم التسليم وتم التسوية" (نقل للمخزون)
+  app.receive_goods_and_settle(
+      receipt_id="REC-01", date="2026-05-05", amount=11500.0
+  )
+
+  # 4. اختبار أمر بيع فوري ومطابقة تكلفة المخزون (الجرد المستمر)
+  app.process_sales_order(
+      so_id="SO-001",
+      date="2026-05-06",
+      sales_amount=7000.0,
+      cogs_amount=4500.0,
+      payment_or_receivable_account=1101,  # نقدي
+      is_booking=False,
+  )
+
+  # 5. اختبار زر توزيع تكلفة الشحن حسب الوزن على الفواتير
+  invoices_list = [
+      {"Invoice_ID": "INV-A1", "Weight": 25.0},
+      {"Invoice_ID": "INV-A2", "Weight": 15.0},
+      {"Invoice_ID": "INV-A3", "Weight": 10.0},
+  ]
+  allocate_shipping_by_weight(
+      invoices_weights=invoices_list, total_shipping_cost=2000.0
+  )
+
+  # 6. استخراج ميزان المراجعة وقائمة الدخل النهائية
+  print("\n--- تقرير ميزان المراجعة ---")
+  tb = app.generate_trial_balance()
+  print(tb.to_string(index=False))
+
+  app.generate_income_statement(tb)
