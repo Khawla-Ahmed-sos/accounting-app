@@ -1,252 +1,75 @@
-import pandas as pd
-
-
-class AccountingEngine:
-
-  def __init__(self, chart_of_accounts):
-    """تهيئة المحرك المحاسبي بدليل الحسابات"""
-    self.coa = chart_of_accounts
-    self.journal_entries = []
-
-  def add_journal_entry(self, entry_id, date, entries, description=""):
-    """إضافة قيد محاسبي مع التحقق الصارم من التوازن (المدين = الدائن)"""
-    total_debit = sum(item.get("Debit", 0) for item in entries)
-    total_credit = sum(item.get("Credit", 0) for item in entries)
-
-    if round(total_debit, 2) != round(total_credit, 2):
-      raise ValueError(
-          f"❌ [خطأ محاسبي]: رفض القيد ({entry_id}) لعدم التوازن! إجمالي المدين"
-          f" ({total_debit:,.2f}) لا يساوي إجمالي الدائن"
-          f" ({total_credit:,.2f})."
-      )
-
-    for item in entries:
-      self.journal_entries.append({
-          "Entry_ID": entry_id,
-          "Date": date,
-          "Account_ID": item["Account_ID"],
-          "Debit": item.get("Debit", 0.0),
-          "Credit": item.get("Credit", 0.0),
-          "Description": description,
-      })
-    print(
-        f"✅ [ترحيل ناجح]: القيد ({entry_id}) متزن وتم إثباته في دفتر اليومية"
-        f" (المبلغ: {total_debit:,.2f} د.ل)."
-    )
-
-  def process_purchase_order(
-      self,
-      po_id,
-      date,
-      supplier_id,
-      payment_method_account,
-      items_amount,
-      is_import=False,
-      shipping_cost=0.0,
-  ):
-    """معالجة أمر الشراء (محلي / استيراد مع بضاعة في الطريق)"""
-    total_invoice = items_amount + shipping_cost
-    entries = [{"Account_ID": 1107, "Debit": items_amount, "Credit": 0.0}]
-
-    if is_import and shipping_cost > 0:
-      entries.append(
-          {"Account_ID": 1108, "Debit": shipping_cost, "Credit": 0.0}
-      )
-
-    entries.append(
-        {
-            "Account_ID": payment_method_account,
-            "Debit": 0.0,
-            "Credit": total_invoice,
+class SAPFicoERP:
+    def __init__(self):
+        # الأرصدة الافتتاحية
+        self.accounts = {
+            "البنك": 50000.0,
+            "المخزون": 0.0,
+            "الموردين": 0.0,
+            "العملاء": 0.0,
+            "إيرادات المبيعات": 0.0,
+            "تكلفة البضاعة المباعة": 0.0,
+            "مصاريف الشحن": 0.0
         }
-    )
+        self.inventory_qty = 0
+        self.item_cost = 0.0
 
-    self.add_journal_entry(
-        entry_id=po_id,
-        date=date,
-        entries=entries,
-        description="إصدار أمر شراء - بضاعة في الطريق",
-    )
+    def process_purchase(self, qty, unit_price, shipping_cost):
+        """دورة المشتريات (P2P): توزيع مصاريف الشحن وحساب التكلفة الفعلية"""
+        total_purchase = qty * unit_price
+        total_cost_with_shipping = total_purchase + shipping_cost
+        
+        # حساب التكلفة الفعلية للقطعة الواحدة (تضمين الشحن)
+        self.item_cost = total_cost_with_shipping / qty
+        self.inventory_qty += qty
+        
+        # القيود المحاسبية
+        self.accounts["المخزون"] += total_cost_with_shipping
+        self.accounts["البنك"] -= total_cost_with_shipping
+        
+        print(f"--- [1] تمت دورة المشتريات بنجاح ---")
+        print(f"تكلفة القطعة الفعلية بعد الشحن: {self.item_cost:.2f} د.ل\n")
 
-  def receive_goods_and_settle(self, receipt_id, date, amount):
-    """زر: تم التسليم وتم التسوية (نقل من بضاعة في الطريق إلى المخزون الفعلي)"""
-    entries = [
-        {"Account_ID": 1106, "Debit": amount, "Credit": 0.0},
-        {"Account_ID": 1107, "Debit": 0.0, "Credit": amount},
-    ]
-    self.add_journal_entry(
-        entry_id=receipt_id,
-        date=date,
-        entries=entries,
-        description="استلام البضاعة وتسوية المخزون (جرد مستمر)",
-    )
+    def process_sale(self, sold_qty, selling_price):
+        """دورة المبيعات (O2C): إخراج البضاعة وحساب الأرباح"""
+        if sold_qty > self.inventory_qty:
+            print("خطأ: الكمية المطلوبة غير متوفرة في المخزن!")
+            return
 
-  def process_sales_order(
-      self,
-      so_id,
-      date,
-      sales_amount,
-      cogs_amount,
-      payment_or_receivable_account,
-      is_booking=False,
-  ):
-    """معالجة أمر البيع وتكلفة البضاعة المباعة (الجرد المستمر)"""
-    revenue_account_target = 2102 if is_booking else 4101
+        total_sales = sold_qty * selling_price
+        cogs = sold_qty * self.item_cost # تكلفة البضاعة المباعة
+        
+        # خصم من المخزون وتحديث الحسابات
+        self.inventory_qty -= sold_qty
+        self.accounts["المخزون"] -= cogs
+        self.accounts["البنك"] += total_sales
+        self.accounts["إيرادات المبيعات"] += total_sales
+        self.accounts["تكلفة البضاعة المباعة"] += cogs
+        
+        print(f"--- [2] تمت دورة المبيعات بنجاح ---")
+        print(f"إجمالي قيمة الفاتورة: {total_sales} د.ل\n")
 
-    sales_entries = [
-        {
-            "Account_ID": payment_or_receivable_account,
-            "Debit": sales_amount,
-            "Credit": 0.0,
-        },
-        {"Account_ID": revenue_account_target, "Debit": 0.0, "Credit": sales_amount},
-    ]
-    self.add_journal_entry(
-        entry_id=so_id,
-        date=date,
-        entries=sales_entries,
-        description="إثبات طلب البيع / الإيراد",
-    )
+    def show_trial_balance(self):
+        """عرض ميزان المراجعة وقائمة الدخل (SAP Trial Balance)"""
+        print("="*40)
+        print("        ميزان المراجعة اللحظي (ERP)")
+        print("="*40)
+        for acc, balance in self.accounts.items():
+            print(f"- {acc}: {balance:,.2f} د.ل")
+        
+        print("="*40)
+        net_profit = self.accounts["إيرادات المبيعات"] - self.accounts["تكلفة البضاعة المباعة"]
+        print(f"الرصيد المتبقي بالمخزن: {self.inventory_qty} قطعة")
+        print(f"صافي الربح اللحظي: {net_profit:,.2f} د.ل")
+        print("="*40)
 
-    cogs_entries = [
-        {"Account_ID": 5101, "Debit": cogs_amount, "Credit": 0.0},
-        {"Account_ID": 1106, "Debit": 0.0, "Credit": cogs_amount},
-    ]
-    self.add_journal_entry(
-        entry_id=f"COGS-{so_id}",
-        date=date,
-        entries=cogs_entries,
-        description="إثبات تكلفة البضاعة المباعة (جرد مستمر)",
-    )
+# --- تجربة النظام بالقيم التي استخدمناها سابقاً ---
+erp = SAPFicoERP()
 
-  def generate_trial_balance(self):
-    """إنشاء ميزان المراجعة"""
-    if not self.journal_entries:
-      return pd.DataFrame()
+# 1. شراء 100 قطعة بسعر 20 د.ل ومصاريف شحن 200 د.ل
+erp.process_purchase(qty=100, unit_price=20.0, shipping_cost=200.0)
 
-    df_je = pd.DataFrame(self.journal_entries)
-    tb = df_je.groupby("Account_ID")[["Debit", "Credit"]].sum().reset_index()
-    tb = pd.merge(tb, self.coa, on="Account_ID", how="left")
+# 2. بيع 50 قطعة بسعر 35 د.ل للقطعة
+erp.process_sale(sold_qty=50, selling_price=35.0)
 
-    tb["Net_Debit"] = tb.apply(
-        lambda r: (
-            r["Debit"] - r["Credit"] if r["Debit"] > r["Credit"] else 0.0
-        ),
-        axis=1,
-    )
-    tb["Net_Credit"] = tb.apply(
-        lambda r: (
-            r["Credit"] - r["Debit"] if r["Credit"] > r["Debit"] else 0.0
-        ),
-        axis=1,
-    )
-    return tb[[
-        "Account_ID",
-        "Account_Name",
-        "Account_Type",
-        "Net_Debit",
-        "Net_Credit",
-    ]]
-
-  def generate_income_statement(self, trial_balance):
-    """توليد قائمة الدخل"""
-    rev_df = trial_balance[trial_balance["Account_Type"] == "Revenue"]
-    exp_df = trial_balance[trial_balance["Account_Type"] == "Expense"]
-
-    total_revenue = rev_df["Net_Credit"].sum() - rev_df["Net_Debit"].sum()
-    total_expense = exp_df["Net_Debit"].sum() - exp_df["Net_Credit"].sum()
-    net_income = total_revenue - total_expense
-
-    print("\n" + "=" * 50)
-    print("                 قائمة الدخل (Income Statement)                 ")
-    print("=" * 50)
-    print(f"إجمالي الإيرادات: {total_revenue:,.2f} د.ل")
-    print(f"إجمالي المصروفات وتكلفة البضاعة المباعة: {total_expense:,.2f} د.ل")
-    print("-" * 50)
-    print(f"صافي الدخل (الربح / الخسارة): {net_income:,.2f} د.ل")
-    print("=" * 50)
-    return net_income
-
-
-def allocate_shipping_by_weight(invoices_weights, total_shipping_cost):
-  total_weight = sum(item["Weight"] for item in invoices_weights)
-  if total_weight <= 0:
-    raise ValueError("الوزن الإجمالي يجب أن يكون أكبر من الصفر لتوزيع الشحن.")
-
-  allocation_results = []
-  print(
-      "\n📦 --- [توزيع تكلفة الشحن على الفواتير حسب الوزن النسبي] --- 📦"
-  )
-  print(f"إجمالي تكلفة الشحن المراد توزيعها: {total_shipping_cost:,.2f} د.ل")
-  print(f"إجمالي الوزن الكلي: {total_weight:,.2f} كغ\n")
-
-  for item in invoices_weights:
-    weight_ratio = item["Weight"] / total_weight
-    allocated_cost = total_shipping_cost * weight_ratio
-    allocation_results.append({
-        "Invoice_ID": item["Invoice_ID"],
-        "Weight": item["Weight"],
-        "Ratio": weight_ratio * 100,
-        "Allocated_Shipping_Cost": round(allocated_cost, 2),
-    })
-    print(
-        f"• الفاتورة ({item['Invoice_ID']}) - الوزن: {item['Weight']} كغ"
-        f" ({weight_ratio*100:.1f}%) ──► حصتها من الشحن:"
-        f" {allocated_cost:,.2f} د.ل"
-    )
-
-  print("=" * 60)
-  return pd.DataFrame(allocation_results)
-
-
-if __name__ == "__main__":
-  coa_df = pd.DataFrame([
-      {"Account_ID": 1101, "Account_Name": "النقدية بالخزينة", "Account_Type": "Asset"},
-      {"Account_ID": 1102, "Account_Name": "المصرف (البنوك)", "Account_Type": "Asset"},
-      {"Account_ID": 1106, "Account_Name": "المخزون (جرد مستمر)", "Account_Type": "Asset"},
-      {"Account_ID": 1107, "Account_Name": "بضاعة في الطريق", "Account_Type": "Asset"},
-      {"Account_ID": 1108, "Account_Name": "مصاريف الاستيراد والشحن", "Account_Type": "Asset"},
-      {"Account_ID": 2101, "Account_Name": "الموردون (دائنون)", "Account_Type": "Liability"},
-      {"Account_ID": 2102, "Account_Name": "مقدمات وعربون العملاء", "Account_Type": "Liability"},
-      {"Account_ID": 4101, "Account_Name": "إيراد المبيعات", "Account_Type": "Revenue"},
-      {"Account_ID": 5101, "Account_Name": "تكلفة البضاعة المباعة", "Account_Type": "Expense"},
-  ])
-
-  app = AccountingEngine(coa_df)
-
-  app.process_purchase_order(
-      po_id="PO-IMP-01",
-      date="2026-05-01",
-      supplier_id="SUP-GLOBAL",
-      payment_method_account=2101,
-      items_amount=10000.0,
-      is_import=True,
-      shipping_cost=1500.0,
-  )
-
-  app.receive_goods_and_settle(
-      receipt_id="REC-01", date="2026-05-05", amount=11500.0
-  )
-
-  app.process_sales_order(
-      so_id="SO-01",
-      date="2026-05-06",
-      sales_amount=7000.0,
-      cogs_amount=4500.0,
-      payment_or_receivable_account=1101,
-  )
-
-  invoices_list = [
-      {"Invoice_ID": "INV-A1", "Weight": 25.0},
-      {"Invoice_ID": "INV-A2", "Weight": 15.0},
-      {"Invoice_ID": "INV-A3", "Weight": 10.0},
-  ]
-  allocate_shipping_by_weight(
-      invoices_weights=invoices_list, total_shipping_cost=2000.0
-  )
-
-  print("\n--- تقرير ميزان المراجعة ---")
-  tb = app.generate_trial_balance()
-  print(tb.to_string(index=False))
-
-  app.generate_income_statement(tb)
+# 3. طباعة التقرير النهائي
+erp.show_trial_balance()
