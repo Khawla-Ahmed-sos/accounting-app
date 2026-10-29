@@ -1,11 +1,103 @@
 """
 نظام المحاسبة المتكامل للشركات (الجرد المستمر والمعايير الدولية IFRS)
-يشمل: دليل الحسابات، أوامر الشراء، أوامر البيع، التسويات، اليومية الأمريكية، 
-دفتر الأستاذ العام، ميزان المراجعة، التسويات الجردية، التقارير والقوائم المالية، ومطابقة الذكاء الاصطناعي.
+مع نظام حفظ دائم للبيانات باستخدام SQLite.
 """
 
+import sqlite3
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
+
+# ==========================================
+# 0. طبقة قاعدة البيانات للحفظ الدائم (Persistent Storage)
+# ==========================================
+
+class DatabaseManager:
+    DB_NAME = "accounting_system.db"
+
+    @classmethod
+    def initialize_db(cls):
+        """إنشاء الجداول في قاعدة البيانات إذا لم تكن موجودة"""
+        conn = sqlite3.connect(cls.DB_NAME)
+        cursor = conn.cursor()
+        
+        # جدول القيود اليومية الرئيسية
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS journal_entries (
+                entry_id TEXT PRIMARY KEY,
+                company_id TEXT,
+                description TEXT,
+                date TEXT,
+                is_posted INTEGER
+            )
+        """)
+        
+        # جدول تفاصيل القيود (الأسطر: مدين ودائن)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS journal_lines (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entry_id TEXT,
+                account_code TEXT,
+                account_name TEXT,
+                debit REAL,
+                credit REAL,
+                FOREIGN KEY (entry_id) REFERENCES journal_entries (entry_id)
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+    @classmethod
+    def save_journal_entry(cls, entry):
+        """حفظ قيد محاسبي بشكل دائم في قاعدة البيانات"""
+        conn = sqlite3.connect(cls.DB_NAME)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "INSERT OR REPLACE INTO journal_entries (entry_id, company_id, description, date, is_posted) VALUES (?, ?, ?, ?, ?)",
+                (entry.entry_id, entry.company_id, entry.description, entry.date.strftime('%Y-%m-%d %H:%M:%S'), 1 if entry.is_posted else 0)
+            )
+            # حذف السطور القديمة لتجنب التكرار عند التحديث
+            cursor.execute("DELETE FROM journal_lines WHERE entry_id = ?", (entry.entry_id,))
+            
+            for line in entry.lines:
+                cursor.execute(
+                    "INSERT INTO journal_lines (entry_id, account_code, account_name, debit, credit) VALUES (?, ?, ?, ?, ?)",
+                    (entry.entry_id, line.account_code, line.account_name, line.debit, line.credit)
+                )
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    @classmethod
+    def load_all_entries(cls, company_id: str) -> List['JournalEntry']:
+        """استرجاع جميع القيود الخاصة بالشركة من الحفظ الدائم"""
+        conn = sqlite3.connect(cls.DB_NAME)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT entry_id, company_id, description, date, is_posted FROM journal_entries WHERE company_id = ?", (company_id,))
+        rows = cursor.fetchall()
+        
+        entries = []
+        for row in rows:
+            entry_id, comp_id, desc, date_str, is_posted = row
+            dt = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+            entry = JournalEntry(entry_id, comp_id, desc, dt)
+            entry.is_posted = bool(is_posted)
+            
+            # جلب تفاصيل السطور
+            cursor.execute("SELECT account_code, account_name, debit, credit FROM journal_lines WHERE entry_id = ?", (entry_id,))
+            line_rows = cursor.fetchall()
+            for l_row in line_rows:
+                entry.lines.append(JournalEntryLine(l_row[0], l_row[1], l_row[2], l_row[3]))
+            
+            entries.append(entry)
+            
+        conn.close()
+        return entries
+
 
 # ==========================================
 # 1. دليل الحسابات القياسي (Chart of Accounts)
@@ -19,27 +111,18 @@ class AccountType:
     EXPENSE = "المصروفات"
 
 DEFAULT_CHART_OF_ACCOUNTS = {
-    # الأصول
     "1101": {"name": "النقدية بالخزينة (نقدي)", "type": AccountType.ASSET, "parent": "1100"},
     "1102": {"name": "البنك / المصرف", "type": AccountType.ASSET, "parent": "1100"},
     "1103": {"name": "المدينون (العملاء)", "type": AccountType.ASSET, "parent": "1100"},
     "1104": {"name": "مخزون البضاعة (جرد مستمر)", "type": AccountType.ASSET, "parent": "1100"},
     "1105": {"name": "بضاعة في الطريق (استيراد/شحن)", "type": AccountType.ASSET, "parent": "1100"},
     "1106": {"name": "ذمم شركات الشحن والمندوبين", "type": AccountType.ASSET, "parent": "1100"},
-    
-    # الالتزامات
     "2101": {"name": "الدائنون (الموردون)", "type": AccountType.LIABILITY, "parent": "2100"},
     "2102": {"name": "تأمينات وعرابين مقبوضة (مقدم عملاء)", "type": AccountType.LIABILITY, "parent": "2100"},
     "2103": {"name": "حساب المقاصة الشريك/التسويات", "type": AccountType.LIABILITY, "parent": "2100"},
-    
-    # حقوق الملكية
     "3101": {"name": "رأس المال", "type": AccountType.EQUITY, "parent": "3100"},
     "3102": {"name": "جاري المالك / الشركاء", "type": AccountType.EQUITY, "parent": "3100"},
-    
-    # الإيرادات
     "4101": {"name": "إيرادات المبيعات", "type": AccountType.REVENUE, "parent": "4100"},
-    
-    # المصروفات وتكلفة المبيعات
     "5101": {"name": "تكلفة البضاعة المباعة (COGS)", "type": AccountType.EXPENSE, "parent": "5100"},
     "5102": {"name": "مسموحات وتسويات المبيعات", "type": AccountType.EXPENSE, "parent": "5100"},
     "5103": {"name": "مصروفات التشغيل والشحن", "type": AccountType.EXPENSE, "parent": "5100"},
@@ -69,7 +152,7 @@ class JournalEntry:
         self.lines.append(JournalEntryLine(account_code, account_name, debit, credit))
 
     def validate_and_post(self) -> bool:
-        """التحقق الصارم من توازن القيد وفق المعايير الدولية قبل الترحيل"""
+        """التحقق الصارم من توازن القيد وفق المعايير الدولية وحفظه في النظام الدائم"""
         total_debit = sum(line.debit for line in self.lines)
         total_credit = sum(line.credit for line in self.lines)
 
@@ -79,10 +162,13 @@ class JournalEntry:
                 f"إجمالي المدين ({total_debit}) لا يساوي إجمالي الدائن ({total_credit})."
             )
         self.is_posted = True
+        
+        # حفظ دائم آلي بمجرد اجتياز شرط التوازن
+        DatabaseManager.save_journal_entry(self)
         return True
 
 # ==========================================
-# 3. إدارة أوامر الشراء (محلي / استيراد / AI)
+# 3. إدارة أوامر الشراء
 # ==========================================
 
 class PurchaseManager:
@@ -90,11 +176,6 @@ class PurchaseManager:
     def create_purchase_order(
         entry_id: str, company_id: str, purchase_type: str, payment_method: str, amount: float
     ) -> JournalEntry:
-        """
-        أمر شراء: 
-        - شحن محلي / شحن دولي (استيراد)
-        - الدفع: نقدي / مصرف / دائنون / جاري المالك
-        """
         entry = JournalEntry(entry_id, company_id, f"أمر شراء ({purchase_type}) - الدفع: {payment_method}")
 
         target_code = "1104" if purchase_type == "محلي" else "1105"
@@ -116,7 +197,7 @@ class PurchaseManager:
 
     @staticmethod
     def settle_imported_goods(entry_id: str, company_id: str, amount: float) -> JournalEntry:
-        """زر الحالة: بضاعة في الطريق -> [تم التسليم وتم التسوية]"""
+        """زر بضاعة في الطريق -> تم التسليم وتم التسوية"""
         entry = JournalEntry(entry_id, company_id, "تسوية بضاعة في الطريق إلى المخزون الرئيسي")
         entry.add_line("1104", "مخزون البضاعة (جرد مستمر)", debit=amount, credit=0.0)
         entry.add_line("1105", "بضاعة في الطريق (استيراد/شحن)", debit=0.0, credit=amount)
@@ -140,13 +221,6 @@ class SalesManager:
         cost_amount: float,
         advance_paid: float = 0.0
     ) -> List[JournalEntry]:
-        """
-        أمر بيع:
-        - طريقة الدفع: نقدي / مصرف / مدينون / مقاصة
-        - تسليم القيمة: كامل / جزئي / عربون
-        - حالة الطلب: فوري / حجز
-        - مستلم القيمة: شركات الشحن / مندوبي الشركة
-        """
         entries = []
         sales_entry = JournalEntry(entry_id, company_id, f"أمر بيع ({order_status}) - تحصيل: {collector}")
 
@@ -186,7 +260,7 @@ class SalesManager:
 
     @staticmethod
     def create_sales_adjustment(entry_id: str, company_id: str, adjustment_amount: float, reason: str) -> JournalEntry:
-        """زر تسويات لقيمة المبيعات (مسموحات ومردودات مبيعات)"""
+        """زر تسويات لقيمة المبيعات"""
         entry = JournalEntry(entry_id, company_id, f"تسويات مبيعات: {reason}")
         entry.add_line("5102", "مسموحات وتسويات المبيعات", debit=adjustment_amount, credit=0.0)
         entry.add_line("1103", "المدينون (العملاء)", debit=0.0, credit=adjustment_amount)
@@ -196,47 +270,51 @@ class SalesManager:
 class AIInvoiceScanner:
     @staticmethod
     def scan_and_match(invoice_image_path: str) -> dict:
-        """مسح فاتورة الشراء بالذكاء الاصطناعي ومطابقتها يدوياً"""
-        # محاكاة تحليل الفاتورة
+        """محاكاة مسح فاتورة الشراء بالذكاء الاصطناعي والمطابقة اليدوية"""
         return {
-            "extracted_supplier": "شركة التوريدات الحديثة",
-            "extracted_total": 12000.0,
-            "items": [{"name": "منتج أ", "qty": 50, "price": 240.0}],
-            "status": "جاهز للمطابقة والتعديل اليدوي من المستخدم"
+            "extracted_supplier": "شركة الموردين الذكية",
+            "extracted_total": 15000.0,
+            "items": [{"name": "منتج تجريبي", "qty": 10, "price": 1500.0}],
+            "status": "تم المسح بالذكاء الاصطناعي - بانتظار الاعتماد اليدوي"
         }
 
 # ==========================================
-# 5. دفاتر الأستاذ، ميزان المراجعة، والتسويات الجردية
+# 5. النظام المحاسبي الشامل واسترجاع البيانات الدائمة
 # ==========================================
 
 class AccountingSystem:
     def __init__(self, company_id: str):
+        DatabaseManager.initialize_db()
         self.company_id = company_id
         self.chart_of_accounts = DEFAULT_CHART_OF_ACCOUNTS.copy()
-        self.journal_ledger: List[JournalEntry] = []
+        
+    @property
+    def journal_ledger(self) -> List[JournalEntry]:
+        """جلب البيانات دائماً من قاعدة البيانات لضمان عدم ضياعها"""
+        return DatabaseManager.load_all_entries(self.company_id)
 
     def post_opening_balance(self, balances: Dict[str, Dict[str, float]]) -> JournalEntry:
-        """إثبات القيد الافتتاحي لكل شركة على حدة ورصده آلياً"""
+        """القيد الافتتاحي لكل شركة وحفظه فوراً"""
         entry = JournalEntry("OPENING-001", self.company_id, "القيد الافتتاحي للشركة")
         for acc_code, val in balances.items():
             acc_name = self.chart_of_accounts.get(acc_code, {}).get("name", "حساب غير معرف")
             entry.add_line(acc_code, acc_name, debit=val.get("debit", 0.0), credit=val.get("credit", 0.0))
         entry.validate_and_post()
-        self.journal_ledger.append(entry)
         return entry
 
     def generate_american_journal(self):
-        """دفتر اليومية الأمريكية المطابق للمعايير"""
+        """دفتر اليومية الأمريكية"""
+        entries = self.journal_ledger
         print(f"\n==================== دفتر اليومية الأمريكية - الشركة: {self.company_id} ====================")
         print(f"{'رقم القيد':<12} | {'التاريخ':<10} | {'البيان':<38} | {'المدين':<10} | {'الدائن':<10}")
         print("-" * 90)
-        for entry in self.journal_ledger:
+        for entry in entries:
             for line in entry.lines:
                 print(f"{entry.entry_id:<12} | {entry.date.strftime('%Y-%m-%d')} | {line.account_name:<38} | {line.debit:<10} | {line.credit:<10}")
         print("-" * 90)
 
     def generate_general_ledger(self) -> Dict[str, Dict[str, float]]:
-        """دفتر الأستاذ العام (ترصيد كل حساب)"""
+        """دفتر الأستاذ العام"""
         ledger = {}
         for code, info in self.chart_of_accounts.items():
             ledger[code] = {"name": info["name"], "debit_total": 0.0, "credit_total": 0.0, "balance": 0.0}
@@ -253,7 +331,7 @@ class AccountingSystem:
         return ledger
 
     def generate_trial_balance(self, stage_title: str = "قبل التسويات الجردية"):
-        """ميزان المراجعة (قبل وبعد التسويات الجردية)"""
+        """ميزان المراجعة"""
         ledger = self.generate_general_ledger()
         print(f"\n==================== ميزان المراجعة ({stage_title}) ====================")
         print(f"{'كود الحساب':<10} | {'اسم الحساب':<35} | {'إجمالي المدين':<12} | {'إجمالي الدائن':<12}")
@@ -270,7 +348,7 @@ class AccountingSystem:
         print("=" * 75)
 
     def generate_financial_reports(self):
-        """القوائم والتقارير المالية النهائية (قائمة الدخل والمركز المالي)"""
+        """القوائم والتقارير المالية النهائية"""
         ledger = self.generate_general_ledger()
         
         total_revenues = sum(data["credit_total"] - data["debit_total"] for code, data in ledger.items() if code.startswith("4"))
@@ -295,43 +373,33 @@ class AccountingSystem:
         print("=" * 75)
 
 # ==========================================
-# 6. تشغيل واختبار المنظومة بالكامل
+# 6. التشغيل والتأكيد على الحفظ الدائم
 # ==========================================
 
 if __name__ == "__main__":
-    # إنشاء المنظومة لشركة تجارية
-    company = AccountingSystem(company_id="CORP-2026")
+    # تشغيل المنظومة لشركة معينة (البيانات ستحفظ تلقائياً في ملف accounting_system.db)
+    company = AccountingSystem(company_id="CORP-2026-PERSISTENT")
 
-    # 1. القيد الافتتاحي
-    company.post_opening_balance({
-        "1101": {"debit": 100000.0, "credit": 0.0},
-        "1102": {"debit": 250000.0, "credit": 0.0},
-        "3101": {"debit": 0.0, "credit": 350000.0}
-    })
+    # إذا كانت البيانات غير موجودة مسبقاً، قم بإضافتها:
+    try:
+        company.post_opening_balance({
+            "1101": {"debit": 200000.0, "credit": 0.0},
+            "1102": {"debit": 300000.0, "credit": 0.0},
+            "3101": {"debit": 0.0, "credit": 500000.0}
+        })
+        
+        PurchaseManager.create_purchase_order("PO-99", "CORP-2026-PERSISTENT", "استيراد", "مصرف", 60000.0)
+        PurchaseManager.settle_imported_goods("SETTLE-99", "CORP-2026-PERSISTENT", 60000.0)
+        
+        SalesManager.create_sales_order(
+            "SO-99", "CORP-2026-PERSISTENT", "نقدي", "عربون", "فوري", "شركات الشحن", 40000.0, 25000.0, 15000.0
+        )
+        SalesManager.create_sales_adjustment("ADJ-99", "CORP-2026-PERSISTENT", 500.0, "مسموحات مبيعات")
+        print("[+] تم إنشاء وحفظ البيانات بنجاح في قاعدة البيانات الدائمة!")
+    except Exception as e:
+        print("[i] البيانات مسجلة مسبقاً أو تم استرجاعها مباشرة من الحفظ الدائم:", e)
 
-    # 2. أمر شراء دولي (استيراد)
-    po = PurchaseManager.create_purchase_order("PO-01", "CORP-2026", "استيراد", "مصرف", 50000.0)
-    company.journal_ledger.append(po)
-
-    # 3. تسوية بضاعة في الطريق للمخزون (الجرد المستمر)
-    settle = PurchaseManager.settle_imported_goods("SETTLE-01", "CORP-2026", 50000.0)
-    company.journal_ledger.append(settle)
-
-    # 4. أمر بيع (فوري + عربون + شركات الشحن + تكلفة COGS آلية)
-    sales = SalesManager.create_sales_order(
-        "SO-01", "CORP-2026", "نقدي", "عربون", "فوري", "شركات الشحن", 30000.0, 18000.0, 10000.0
-    )
-    company.journal_ledger.extend(sales)
-
-    # 5. زر تسويات المبيعات (مسموحات مبيعات)
-    adj = SalesManager.create_sales_adjustment("ADJ-01", "CORP-2026", 1000.0, "تخفيض عيب صناعة بسيط للعميل")
-    company.journal_ledger.append(adj)
-
-    # 6. عرض دفتر اليومية الأمريكية
+    # عرض التقارير مسترجعة من الحفظ الدائم
     company.generate_american_journal()
-
-    # 7. ميزان المراجعة (قبل التسويات الجردية)
     company.generate_trial_balance("قبل التسويات الجردية")
-
-    # 8. إظهار التقارير والقوائم المالية الختامية
     company.generate_financial_reports()
