@@ -1,285 +1,197 @@
-import pandas as pd
+{
+  "system_info": {
+    "company_name": "الشركة التجارية النموذجية",
+    "accounting_standard": "IFRS / المعايير الدولية",
+    "inventory_method": "الجرد المستمر (Perpetual Inventory)",
+    "currency": "د.ل (دينار ليبي)"
+  },
+  
+  "chart_of_accounts": [
+    {
+      "account_id": 1101,
+      "account_name": "النقدية بالخزينة",
+      "account_type": "Asset",
+      "parent_id": 1100,
+      "is_active": true
+    },
+    {
+      "account_id": 1102,
+      "account_name": "المصرف (البنوك)",
+      "account_type": "Asset",
+      "parent_id": 1100,
+      "is_active": true
+    },
+    {
+      "account_id": 1106,
+      "account_name": "المخزون (جرد مستمر)",
+      "account_type": "Asset",
+      "parent_id": 1100,
+      "is_active": true
+    },
+    {
+      "account_id": 1107,
+      "account_name": "بضاعة في الطريق",
+      "account_type": "Asset",
+      "parent_id": 1100,
+      "is_active": true
+    },
+    {
+      "account_id": 1108,
+      "account_name": "مصاريف الاستيراد والشحن",
+      "account_type": "Asset",
+      "parent_id": 1100,
+      "is_active": true
+    },
+    {
+      "account_id": 2101,
+      "account_name": "الموردون (دائنون)",
+      "account_type": "Liability",
+      "parent_id": 2000,
+      "is_active": true
+    },
+    {
+      "account_id": 2102,
+      "account_name": "مقدمات وعربون العملاء",
+      "account_type": "Liability",
+      "parent_id": 2000,
+      "is_active": true
+    },
+    {
+      "account_id": 4101,
+      "account_name": "إيراد المبيعات",
+      "account_type": "Revenue",
+      "parent_id": 4000,
+      "is_active": true
+    },
+    {
+      "account_id": 5101,
+      "account_name": "تكلفة البضاعة المباعة",
+      "account_type": "Expense",
+      "parent_id": 5000,
+      "is_active": true
+    }
+  ],
 
+  "journal_entries": [
+    {
+      "entry_id": "PO-IMP-01",
+      "date": "2026-05-01",
+      "description": "إصدار أمر شراء استيراد - بضاعة في الطريق ومصاريف شحن",
+      "is_balanced": true,
+      "lines": [
+        {
+          "line_no": 1,
+          "account_id": 1107,
+          "account_name": "بضاعة في الطريق",
+          "debit": 10000.00,
+          "credit": 0.00
+        },
+        {
+          "line_no": 2,
+          "account_id": 1108,
+          "account_name": "مصاريف الاستيراد والشحن",
+          "debit": 1500.00,
+          "credit": 0.00
+        },
+        {
+          "line_no": 3,
+          "account_id": 2101,
+          "account_name": "الموردون (دائنون)",
+          "debit": 0.00,
+          "credit": 11500.00
+        }
+      ]
+    },
+    {
+      "entry_id": "REC-01",
+      "date": "2026-05-05",
+      "description": "استلام البضاعة وتسوية المخزون (جرد مستمر)",
+      "is_balanced": true,
+      "lines": [
+        {
+          "line_no": 1,
+          "account_id": 1106,
+          "account_name": "المخزون (جرد مستمر)",
+          "debit": 11500.00,
+          "credit": 0.00
+        },
+        {
+          "line_no": 2,
+          "account_id": 1107,
+          "account_name": "بضاعة في الطريق",
+          "debit": 0.00,
+          "credit": 11500.00
+        }
+      ]
+    },
+    {
+      "entry_id": "SO-01",
+      "date": "2026-05-06",
+      "description": "إثبات طلب البيع الفوري والإيراد",
+      "is_balanced": true,
+      "lines": [
+        {
+          "line_no": 1,
+          "account_id": 1101,
+          "account_name": "النقدية بالخزينة",
+          "debit": 7000.00,
+          "credit": 0.00
+        },
+        {
+          "line_no": 2,
+          "account_id": 4101,
+          "account_name": "إيراد المبيعات",
+          "debit": 0.00,
+          "credit": 7000.00
+        }
+      ]
+    },
+    {
+      "entry_id": "COGS-SO-01",
+      "date": "2026-05-06",
+      "description": "إثبات تكلفة البضاعة المباعة وتخفيض المخزون",
+      "is_balanced": true,
+      "lines": [
+        {
+          "line_no": 1,
+          "account_id": 5101,
+          "account_name": "تكلفة البضاعة المباعة",
+          "debit": 4500.00,
+          "credit": 0.00
+        },
+        {
+          "line_no": 2,
+          "account_id": 1106,
+          "account_name": "المخزون (جرد مستمر)",
+          "debit": 0.00,
+          "credit": 4500.00
+        }
+      ]
+    }
+  ],
 
-class AccountingEngine:
-
-  def __init__(self, chart_of_accounts):
-    """تهيئة المحرك المحاسبي بدليل الحسابات"""
-    self.coa = chart_of_accounts
-    self.journal_entries = []
-
-  def add_journal_entry(self, entry_id, date, entries, description=""):
-    """إضافة قيد محاسبي مع التحقق الصارم من التوازن (المدين = الدائن)"""
-    total_debit = sum(item.get("Debit", 0) for item in entries)
-    total_credit = sum(item.get("Credit", 0) for item in entries)
-
-    if round(total_debit, 2) != round(total_credit, 2):
-      raise ValueError(
-          f"❌ [خطأ محاسبي]: رفض القيد ({entry_id}) لعدم التوازن! إجمالي المدين"
-          f" ({total_debit:,.2f}) لا يساوي إجمالي الدائن"
-          f" ({total_credit:,.2f})."
-      )
-
-    for item in entries:
-      self.journal_entries.append({
-          "Entry_ID": entry_id,
-          "Date": date,
-          "Account_ID": item["Account_ID"],
-          "Debit": item.get("Debit", 0.0),
-          "Credit": item.get("Credit", 0.0),
-          "Description": description,
-      })
-    print(
-        f"✅ [ترحيل ناجح]: القيد ({entry_id}) متزن وتم إثباته في دفتر اليومية"
-        f" (المبلغ: {total_debit:,.2f})."
-    )
-
-  def distribute_shipping_cost_by_weight(self, shipments):
-    """زر شامل: توزيع تكلفة الشحن الإجمالية على الفواتير أو البضائع حسب الوزن النسبي
-
-    shipments: قائمة قواميس [{ 'Invoice_ID': 'INV-1', 'Weight': 15.5 }, ...]
-    total_shipping_cost: إجمالي فاتورة شركة الشحن أو التخليص
-    """
-    total_weight = sum(s["Weight"] for s in shipments)
-    if total_weight <= 0:
-      raise ValueError("❌ الوزن الإجمالي يجب أن يكون أكبر من الصفر.")
-
-    distributed_results = []
-    print("\n--- [توزيع تكلفة الشحن حسب الوزن] ---")
-    for s in shipments:
-      # حصة الفاتورة من الوزن الإجمالي * إجمالي تكلفة الشحن
-      # (يمكن تمرير إجمالي التكلفة كمعامل للدالة)
-      pass
-
-  def process_purchase_order(
-      self,
-      po_id,
-      date,
-      supplier_id,
-      payment_method_account,
-      items_amount,
-      is_import=False,
-      shipping_cost=0.0,
-  ):
-    """معالجة أمر الشراء (مؤقت: بضاعة في الطريق / استيراد محلي ودولي)"""
-    total_amount = items_amount + shipping_cost
-    entries = [{"Account_ID": 1107, "Debit": total_amount, "Credit": 0.0}]  # بضاعة في الطريق (تكلفة رأسمالية)
-
-    if is_import and shipping_cost > 0:
-      # إثبات مصاريف الشحن الدولي ضمن الاعتماد أو بضاعة في الطريق
-      entries.append(
-          {"Account_ID": 1108, "Debit": shipping_cost, "Credit": 0.0}
-      )
-
-    # طريقة الدفع (نقدي 1101، مصرف 1102، دائنون/موردون 2101، جاري المالك 2104)
-    entries.append(
-        {"Account_ID": payment_method_account, "Debit": 0.0, "Credit": total_amount}
-    )
-
-    self.add_journal_entry(
-        entry_id=po_id,
-        date=date,
-        entries=entries,
-        description="إصدار أمر شراء - بضاعة في الطريق",
-    )
-
-  def receive_goods_and_settle(self, receipt_id, date, amount):
-    """زر: تم التسليم وتم التسوية (نقل من بضاعة في الطريق إلى المخزون الفعلي)"""
-    entries = [
-        {"Account_ID": 1106, "Debit": amount, "Credit": 0.0},  # المخزون الفعلي
-        {"Account_ID": 1107, "Debit": 0.0, "Credit": amount},  # إغلاق بضاعة في الطريق
+  "shipping_allocations_log": {
+    "total_shipping_cost": 2000.00,
+    "total_weight_kg": 50.00,
+    "allocated_invoices": [
+      {
+        "invoice_id": "INV-A1",
+        "weight_kg": 25.00,
+        "ratio_percentage": 50.0,
+        "allocated_cost": 1000.00
+      },
+      {
+        "invoice_id": "INV-A2",
+        "weight_kg": 15.00,
+        "ratio_percentage": 30.0,
+        "allocated_cost": 600.00
+      },
+      {
+        "invoice_id": "INV-A3",
+        "weight_kg": 10.00,
+        "ratio_percentage": 20.0,
+        "allocated_cost": 400.00
+      }
     ]
-    self.add_journal_entry(
-        entry_id=receipt_id,
-        date=date,
-        entries=entries,
-        description="استلام البضاعة وتسوية المخزون (جرد مستمر)",
-    )
-
-  def process_sales_order(
-      self,
-      so_id,
-      date,
-      sales_amount,
-      cogs_amount,
-      payment_or_receivable_account,
-      is_booking=False,
-  ):
-    """معالجة أمر البيع وتسليم القيمة وتكلفة البضاعة المباعة آلياً (الجرد المستمر)"""
-    # 1. قيد الإيراد أو العربون
-    revenue_account_target = (
-        2102 if is_booking else 4101
-    )  # 2102 مقدمات عملاء / 4101 إيراد مبيعات
-    sales_entries = [
-        {"Account_ID": payment_or_receivable_account, "Debit": sales_amount, "Credit": 0.0},
-        {"Account_ID": revenue_account_target, "Debit": 0.0, "Credit": sales_amount},
-    ]
-    self.add_journal_entry(
-        entry_id=so_id,
-        date=date,
-        entries=sales_entries,
-        description="إثبات طلب البيع / الإيراد",
-    )
-
-    # 2. قيد تكلفة البضاعة المباعة (المخزون يتحرك آلياً في الجرد المستمر)
-    cogs_entries = [
-        {"Account_ID": 5101, "Debit": cogs_amount, "Credit": 0.0},  # تكلفة البضاعة المباعة
-        {"Account_ID": 1106, "Debit": 0.0, "Credit": cogs_amount},  # تخفيض المخزون الفعلي
-    ]
-    self.add_journal_entry(
-        entry_id=f"COGS-{so_id}",
-        date=date,
-        entries=cogs_entries,
-        description="إثبات تكلفة البضاعة المباعة (جرد مستمر)",
-    )
-
-  def generate_trial_balance(self):
-    """إنشاء ميزان المراجعة"""
-    if not self.journal_entries:
-      return pd.DataFrame()
-
-    df_je = pd.DataFrame(self.journal_entries)
-    tb = df_je.groupby("Account_ID")[["Debit", "Credit"]].sum().reset_index()
-    tb = pd.merge(tb, self.coa, on="Account_ID", how="left")
-
-    tb["Net_Debit"] = tb.apply(
-        lambda r: (
-            r["Debit"] - r["Credit"] if r["Debit"] > r["Credit"] else 0.0
-        ),
-        axis=1,
-    )
-    tb["Net_Credit"] = tb.apply(
-        lambda r: (
-            r["Credit"] - r["Debit"] if r["Credit"] > r["Debit"] else 0.0
-        ),
-        axis=1,
-    )
-    return tb[[
-        "Account_ID",
-        "Account_Name",
-        "Account_Type",
-        "Net_Debit",
-        "Net_Credit",
-    ]]
-
-  def generate_income_statement(self, trial_balance):
-    """توليد قائمة الدخل"""
-    rev_df = trial_balance[trial_balance["Account_Type"] == "Revenue"]
-    exp_df = trial_balance[trial_balance["Account_Type"] == "Expense"]
-
-    total_revenue = rev_df["Net_Credit"].sum() - rev_df["Net_Debit"].sum()
-    total_expense = exp_df["Net_Debit"].sum() - exp_df["Net_Credit"].sum()
-    net_income = total_revenue - total_expense
-
-    print("\n" + "=" * 50)
-    print("                 قائمة الدخل (Income Statement)                 ")
-    print("=" * 50)
-    print(f"إجمالي الإيرادات: {total_revenue:,.2f}")
-    print(f"إجمالي المصروفات وتكلفة البضاعة المباعة: {total_expense:,.2f}")
-    print("-" * 50)
-    print(f"صافي الدخل (الربح / الخسارة): {net_income:,.2f}")
-    print("=" * 50)
-    return net_income
-
-
-# ==========================================
-# دالة إضافية مخصصة: زر توزيع تكلفة الشحن حسب الوزن
-# ==========================================
-def allocate_shipping_by_weight(invoices_weights, total_shipping_cost):
-  """توزيع تكلفة الشحن الإجالية على الفواتير تناسبياً حسب الوزن
-
-  invoices_weights: قائمة قواميس [{ 'Invoice_ID': 'INV-01', 'Weight': 10 }, ...]
-  total_shipping_cost: إجمالي فاتورة الشحن المراد توزيعها
-  """
-  total_weight = sum(item["Weight"] for item in invoices_weights)
-  if total_weight <= 0:
-    raise ValueError("الوزن الإجمالي يجب أن يكون أكبر من الصفر لتوزيع الشحن.")
-
-  allocation_results = []
-  print(
-      "\n📦 --- [توزيع تكلفة الشحن على الفواتير حسب الوزن النسبي] --- 📦"
-  )
-  print(f"إجمالي تكلفة الشحن المراد توزيعها: {total_shipping_cost:,.2f}")
-  print(f"إجمالي الوزن الكلي: {total_weight:,.2f} كغ\n")
-
-  for item in invoices_weights:
-    weight_ratio = item["Weight"] / total_weight
-    allocated_cost = total_shipping_cost * weight_ratio
-    allocation_results.append({
-        "Invoice_ID": item["Invoice_ID"],
-        "Weight": item["Weight"],
-        "Ratio": weight_ratio * 100,
-        "Allocated_Shipping_Cost": round(allocated_cost, 2),
-    })
-    print(
-        f"• الفاتورة ({item['Invoice_ID']}) - الوزن: {item['Weight']} كغ"
-        f" ({weight_ratio*100:.1f}%) ──► حصتها من الشحن:"
-        f" {allocated_cost:,.2f} د.ل"
-    )
-
-  print("=" * 60)
-  return pd.DataFrame(allocation_results)
-
-
-# ==========================================
-# تجربة وتثبيت النظام المتكامل
-# ==========================================
-if __name__ == "__main__":
-  # 1. دليل الحسابات الشامل
-  coa_df = pd.DataFrame([
-      {"Account_ID": 1101, "Account_Name": "النقدية بالخزينة", "Account_Type": "Asset"},
-      {"Account_ID": 1102, "Account_Name": "المصرف (البنوك)", "Account_Type": "Asset"},
-      {"Account_ID": 1106, "Account_Name": "المخزون (جرد مستمر)", "Account_Type": "Asset"},
-      {"Account_ID": 1107, "Account_Name": "بضاعة في الطريق", "Account_Type": "Asset"},
-      {"Account_ID": 1108, "Account_Name": "مصاريف الاستيراد والشحن", "Account_Type": "Asset"},
-      {"Account_ID": 2101, "Account_Name": "الموردون (دائنون)", "Account_Type": "Liability"},
-      {"Account_ID": 2102, "Account_Name": "مقدمات وعربون العملاء", "Account_Type": "Liability"},
-      {"Account_ID": 2104, "Account_Name": "جاري المالك", "Account_Type": "Liability"},
-      {"Account_ID": 4101, "Account_Name": "إيراد المبيعات", "Account_Type": "Revenue"},
-      {"Account_ID": 5101, "Account_Name": "تكلفة البضاعة المباعة", "Account_Type": "Expense"},
-  ])
-
-  app = AccountingEngine(coa_df)
-
-  # 2. اختبار أمر شراء دولي/استيراد مع شحن
-  app.process_purchase_order(
-      po_id="PO-IMP-2026-01",
-      date="2026-05-01",
-      supplier_id="SUP-GLOBAL",
-      payment_method_account=2101,  # دائنون (موردون)
-      items_amount=10000.0,
-      is_import=True,
-      shipping_cost=1500.0,
-  )
-
-  # 3. اختبار زر "تم التسليم وتم التسوية" (نقل للمخزون)
-  app.receive_goods_and_settle(
-      receipt_id="REC-01", date="2026-05-05", amount=11500.0
-  )
-
-  # 4. اختبار أمر بيع فوري ومطابقة تكلفة المخزون (الجرد المستمر)
-  app.process_sales_order(
-      so_id="SO-001",
-      date="2026-05-06",
-      sales_amount=7000.0,
-      cogs_amount=4500.0,
-      payment_or_receivable_account=1101,  # نقدي
-      is_booking=False,
-  )
-
-  # 5. اختبار زر توزيع تكلفة الشحن حسب الوزن على الفواتير
-  invoices_list = [
-      {"Invoice_ID": "INV-A1", "Weight": 25.0},
-      {"Invoice_ID": "INV-A2", "Weight": 15.0},
-      {"Invoice_ID": "INV-A3", "Weight": 10.0},
-  ]
-  allocate_shipping_by_weight(
-      invoices_weights=invoices_list, total_shipping_cost=2000.0
-  )
-
-  # 6. استخراج ميزان المراجعة وقائمة الدخل النهائية
-  print("\n--- تقرير ميزان المراجعة ---")
-  tb = app.generate_trial_balance()
-  print(tb.to_string(index=False))
-
-  app.generate_income_statement(tb)
+  }
+}
