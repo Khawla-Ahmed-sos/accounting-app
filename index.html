@@ -1,344 +1,107 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>منظومة ERP المحاسبية - منصة الأدوية والتوصيل</title>
-  <style>
-    :root {
-      --bg: #f4f6f9;
-      --card: #ffffff;
-      --primary: #0f766e;
-      --primary-dark: #115e59;
-      --text: #1e293b;
-      --muted: #64748b;
-      --border: #e2e8f0;
-      --danger: #dc2626;
-      --success: #16a34a;
-    }
-    * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; }
-    body { margin: 0; background: var(--bg); color: var(--text); }
-    header {
-      background: var(--primary); color: #fff; padding: 16px 24px;
-      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
-    }
-    header h1 { margin: 0; font-size: 1.25rem; }
-    header span { font-size: 0.85rem; opacity: 0.9; }
-    .container { max-width: 1200px; margin: 20px auto; padding: 0 16px; }
-    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
-    .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
-    .kpi .label { color: var(--muted); font-size: 0.85rem; }
-    .kpi .val { font-size: 1.4rem; font-weight: 700; margin-top: 6px; }
-    .grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 18px; }
-    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
-    .card h2 { margin: 0 0 14px; font-size: 1.05rem; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-    .form-group { margin-bottom: 12px; }
-    label { display: block; font-size: 0.85rem; margin-bottom: 4px; color: var(--text); font-weight: 600; }
-    input, select {
-      width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 0.95rem;
-    }
-    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    button {
-      background: var(--primary); color: #fff; border: none; padding: 10px 14px;
-      border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 0.9rem;
-    }
-    button:hover { background: var(--primary-dark); }
-    button.secondary { background: #334155; }
-    button.secondary:hover { background: #1e293b; }
-    button.danger { background: var(--danger); }
-    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-    th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: right; }
-    th { background: #f8fafc; color: var(--muted); font-weight: 700; }
-    .badge { padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
-    .ok { background: #dcfce7; color: var(--success); }
-    .err { background: #fee2e2; color: var(--danger); }
-    .table-wrap { overflow-x: auto; }
-  </style>
-</head>
-<body>
-  <header>
-    <div>
-      <h1>منظومة ERP المحاسبية — البحث عن الأدوية وتوصيلها</h1>
-      <span>قيد مزدوج • حسابات الصيدليات والمندوبين • ميزان مراجعة فوري</span>
-    </div>
-    <div id="tbStatus"></div>
-  </header>
-
-  <div class="container">
-    <div class="kpis">
-      <div class="kpi">
-        <div class="label">إيرادات المنصة (عمولة + توصيل)</div>
-        <div class="val" id="kpiRevenue">0.00</div>
-      </div>
-      <div class="kpi">
-        <div class="label">مستحقات الصيدليات (دائن)</div>
-        <div class="val" id="kpiPharmacyAP">0.00</div>
-      </div>
-      <div class="kpi">
-        <div class="label">مستحقات مندوبي التوصيل (دائن)</div>
-        <div class="val" id="kpiRiderAP">0.00</div>
-      </div>
-      <div class="kpi">
-        <div class="label">النقدية والبنك</div>
-        <div class="val" id="kpiCashBank">0.00</div>
-      </div>
-    </div>
-
-    <div class="grid">
-      <div>
-        <div class="card">
-          <h2>تسجيل طلب دواء وتوصيل</h2>
-          <form id="orderForm">
-            <div class="form-group">
-              <label>اسم الصيدلية المزودة</label>
-              <input type="text" id="pharmacyName" placeholder="مثال: صيدلية الشفاء" required />
-            </div>
-            <div class="row-2">
-              <div class="form-group">
-                <label>تكلفة الدواء للصيدلية</label>
-                <input type="number" step="0.01" min="0" id="medCost" value="80" required />
-              </div>
-              <div class="form-group">
-                <label>عمولة / هامش المنصة</label>
-                <input type="number" step="0.01" min="0" id="platformFee" value="20" required />
-              </div>
-            </div>
-            <div class="row-2">
-              <div class="form-group">
-                <label>أجر التوصيل على العميل</label>
-                <input type="number" step="0.01" min="0" id="deliveryCharge" value="10" required />
-              </div>
-              <div class="form-group">
-                <label>مستحق المندوب عن التوصيل</label>
-                <input type="number" step="0.01" min="0" id="riderPayout" value="8" required />
-              </div>
-            </div>
-            <div class="form-group">
-              <label>طريقة التحصيل من العميل</label>
-              <select id="paymentMethod">
-                <option value="bank">تحويل / بطاقة / محفظة إلكترونية (البنك)</option>
-                <option value="cod">دفع نقدي عند الاستلام (عهدة المندوب)</option>
-              </select>
-            </div>
-            <button type="submit">ترحيل القيد المحاسبي</button>
-          </form>
-        </div>
-
-        <div class="card">
-          <h2>تسويات سريعة</h2>
-          <div class="actions">
-            <button type="button" class="secondary" onclick="settlePayable('2100', 'تسوية مستحقات الصيدليات')">تسوية مستحقات الصيدليات</button>
-            <button type="button" class="secondary" onclick="settlePayable('2110', 'تسوية مستحقات المندوبين')">تسوية مستحقات المندوبين</button>
-            <button type="button" class="danger" onclick="resetData()">إعادة ضبط البيانات</button>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <div class="card">
-          <h2>سجل القيود اليومية (Journal Entries)</h2>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>التاريخ</th>
-                  <th>البيان</th>
-                  <th>الحساب</th>
-                  <th>مدين</th>
-                  <th>دائن</th>
-                </tr>
-              </thead>
-              <tbody id="journalBody"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="card">
-          <h2>ميزان المراجعة (Trial Balance)</h2>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>رمز الحساب</th>
-                  <th>اسم الحساب</th>
-                  <th>إجمالي مدين</th>
-                  <th>إجمالي دائن</th>
-                  <th>الرصيد</th>
-                </tr>
-              </thead>
-              <tbody id="tbBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    const ACCOUNTS = {
-      "1100": { name: "عهدة نقدية / تحصيل المندوبين", type: "asset" },
-      "1110": { name: "البنك والمحافظ الإلكترونية", type: "asset" },
-      "2100": { name: "حسابات دائنة - الصيدليات", type: "liability" },
-      "2110": { name: "حسابات دائنة - مندوبي التوصيل", type: "liability" },
-      "4100": { name: "إيراد عمولة المنصة", type: "revenue" },
-      "4110": { name: "إيراد رسوم التوصيل", type: "revenue" }
-    };
-
-    const STORAGE_KEY = "med_delivery_erp_v1";
-
-    function loadEntries() {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
-      return [];
-    }
-
-    function saveEntries(entries) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-    }
-
-    function addJournalEntry(description, lines) {
-      const totalDebit = lines.reduce((s, l) => s + l.debit, 0);
-      const totalCredit = lines.reduce((s, l) => s + l.credit, 0);
-      if (Math.abs(totalDebit - totalCredit) > 0.001) {
-        alert("خطأ محاسبي: القيد غير متوازن!");
-        return;
-      }
-      const entries = loadEntries();
-      entries.unshift({
-        id: Date.now(),
-        date: new Date().toLocaleString("ar-EG", { dateStyle: "short", timeStyle: "short" }),
-        description,
-        lines
-      });
-      saveEntries(entries);
-      render();
-    }
-
-    document.getElementById("orderForm").addEventListener("submit", (e) => {
-      e.preventDefault();
-      const pharmacy = document.getElementById("pharmacyName").value.trim() || "صيدلية";
-      const medCost = parseFloat(document.getElementById("medCost").value) || 0;
-      const platformFee = parseFloat(document.getElementById("platformFee").value) || 0;
-      const deliveryCharge = parseFloat(document.getElementById("deliveryCharge").value) || 0;
-      const riderPayout = parseFloat(document.getElementById("riderPayout").value) || 0;
-      const method = document.getElementById("paymentMethod").value;
-
-      const customerTotal = medCost + platformFee + deliveryCharge;
-      const cashAccount = method === "cod" ? "1100" : "1110";
-
-      const lines = [
-        { account: cashAccount, debit: customerTotal, credit: 0 }
-      ];
-      if (medCost > 0) lines.push({ account: "2100", debit: 0, credit: medCost });
-      if (riderPayout > 0) lines.push({ account: "2110", debit: 0, credit: riderPayout });
-      if (platformFee > 0) lines.push({ account: "4100", debit: 0, credit: platformFee });
-      if (deliveryCharge > 0) lines.push({ account: "4110", debit: 0, credit: deliveryCharge });
-
-      addJournalEntry(`طلب دواء (${pharmacy}) - ${method === "cod" ? "نقدي" : "إلكتروني"}`, lines);
-      document.getElementById("pharmacyName").value = "";
-    });
-
-    function settlePayable(accountCode, label) {
-      const totals = computeAccountTotals(loadEntries());
-      const balance = Math.max(0, (totals[accountCode]?.credit || 0) - (totals[accountCode]?.debit || 0));
-      if (balance <= 0) {
-        alert("لا توجد مستحقات قائمة لتسويتها في هذا الحساب.");
-        return;
-      }
-      addJournalEntry(`${label} (${balance.toFixed(2)})`, [
-        { account: accountCode, debit: balance, credit: 0 },
-        { account: "1110", debit: 0, credit: balance }
-      ]);
-    }
-
-    function resetData() {
-      if (confirm("هل تريد مسح جميع القيود المحاسبية؟")) {
-        localStorage.removeItem(STORAGE_KEY);
-        render();
-      }
-    }
-
-    function computeAccountTotals(entries) {
-      const map = {};
-      for (const code of Object.keys(ACCOUNTS)) {
-        map[code] = { debit: 0, credit: 0 };
-      }
-      for (const entry of entries) {
-        for (const line of entry.lines) {
-          if (!map[line.account]) map[line.account] = { debit: 0, credit: 0 };
-          map[line.account].debit += line.debit;
-          map[line.account].credit += line.credit;
-        }
-      }
-      return map;
-    }
-
-    function render() {
-      const entries = loadEntries();
-      const totals = computeAccountTotals(entries);
-
-      // Journal table
-      const jBody = document.getElementById("journalBody");
-      jBody.innerHTML = "";
-      for (const entry of entries.slice(0, 25)) {
-        entry.lines.forEach((line, idx) => {
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td>${idx === 0 ? entry.date : ""}</td>
-            <td>${idx === 0 ? entry.description : ""}</td>
-            <td>${line.account} - ${ACCOUNTS[line.account]?.name || line.account}</td>
-            <td>${line.debit ? line.debit.toFixed(2) : "-"}</td>
-            <td>${line.credit ? line.credit.toFixed(2) : "-"}</td>
-          `;
-          jBody.appendChild(tr);
-        });
-      }
-
-      // Trial Balance table
-      const tbBody = document.getElementById("tbBody");
-      tbBody.innerHTML = "";
-      let sumDebit = 0, sumCredit = 0;
-
-      for (const [code, acc] of Object.entries(ACCOUNTS)) {
-        const d = totals[code]?.debit || 0;
-        const c = totals[code]?.credit || 0;
-        sumDebit += d;
-        sumCredit += c;
-        const net = (acc.type === "asset") ? (d - c) : (c - d);
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${code}</td>
-          <td>${acc.name}</td>
-          <td>${d.toFixed(2)}</td>
-          <td>${c.toFixed(2)}</td>
-          <td><strong>${net.toFixed(2)}</strong></td>
-        `;
-        tbBody.appendChild(tr);
-      }
-
-      const balanced = Math.abs(sumDebit - sumCredit) < 0.001;
-      document.getElementById("tbStatus").innerHTML = balanced
-        ? `<span class="badge ok">ميزان المراجعة متوازن (${sumDebit.toFixed(2)})</span>`
-        : `<span class="badge err">غير متوازن (مدين ${sumDebit.toFixed(2)} / دائن ${sumCredit.toFixed(2)})</span>`;
-
-      // KPIs
-      const rev = ((totals["4100"]?.credit || 0) - (totals["4100"]?.debit || 0)) +
-                  ((totals["4110"]?.credit || 0) - (totals["4110"]?.debit || 0));
-      const pharmAP = (totals["2100"]?.credit || 0) - (totals["2100"]?.debit || 0);
-      const riderAP = (totals["2110"]?.credit || 0) - (totals["2110"]?.debit || 0);
-      const cashBank = ((totals["1100"]?.debit || 0) - (totals["1100"]?.credit || 0)) +
-                       ((totals["1110"]?.debit || 0) - (totals["1110"]?.credit || 0));
-
-      document.getElementById("kpiRevenue").textContent = rev.toFixed(2);
-      document.getElementById("kpiPharmacyAP").textContent = pharmAP.toFixed(2);
-      document.getElementById("kpiRiderAP").textContent = riderAP.toFixed(2);
-      document.getElementById("kpiCashBank").textContent = cashBank.toFixed(2);
-    }
-
-    render();
-  </script>
-</body>
-</html>
-
+code,parent_code,name,statement,ledger_level,normal_balance,erp_role
+1,,الأصول,المركز المالي,الأستاذ العام,مدين,group_asset
+11,1,الأصول غير المتداولة,المركز المالي,الأستاذ العام,مدين,group_asset
+111,11,الأصول الثابتة,المركز المالي,الأستاذ العام,مدين,asset_fixed
+11101,111,الآلات والمعدات,المركز المالي,الأستاذ العام,مدين,asset_fixed
+1110101,11101,حواسيب,المركز المالي,الأستاذ المساعد,مدين,asset_fixed
+11101010001,1110101,حواسيب مكتبية,المركز المالي,الأستاذ التحليلي,مدين,analytic_asset
+11101010002,1110101,حواسيب محمولة,المركز المالي,الأستاذ التحليلي,مدين,analytic_asset
+1110102,11101,ماكينة عد الأموال,المركز المالي,الأستاذ المساعد,مدين,asset_fixed
+11102,111,أثاث,المركز المالي,الأستاذ العام,مدين,asset_fixed
+11103,111,سيارات,المركز المالي,الأستاذ العام,مدين,asset_fixed
+112,11,مجمع استهلاك الأصول الثابتة,المركز المالي,الأستاذ العام,دائن,accumulated_depreciation
+11201,112,مجمع استهلاك الآلات,المركز المالي,الأستاذ العام,دائن,accumulated_depreciation
+1120101,11201,مجمع استهلاك حواسيب,المركز المالي,الأستاذ المساعد,دائن,accumulated_depreciation
+11201010001,1120101,مجمع استهلاك حواسيب مكتبية,المركز المالي,الأستاذ التحليلي,دائن,analytic_depreciation
+11201010002,1120101,مجمع استهلاك حواسيب محمولة,المركز المالي,الأستاذ التحليلي,دائن,analytic_depreciation
+1120102,11201,مجمع استهلاك ماكينة عد الأموال,المركز المالي,الأستاذ المساعد,دائن,accumulated_depreciation
+11202,112,مجمع استهلاك أثاث,المركز المالي,الأستاذ العام,دائن,accumulated_depreciation
+11203,112,مجمع استهلاك سيارات,المركز المالي,الأستاذ العام,دائن,accumulated_depreciation
+113,11,الاستثمارات,المركز المالي,الأستاذ العام,مدين,investment
+11301,113,استثمارات مالية,المركز المالي,الأستاذ العام,مدين,investment
+11302,113,مخصص هبوط وتقييم استثمارات,المركز المالي,الأستاذ العام,دائن,investment_valuation_reserve
+12,1,الأصول المتداولة,المركز المالي,الأستاذ العام,مدين,group_current_asset
+121,12,النقدية وما في حكمها,المركز المالي,الأستاذ العام,مدين,cash_and_bank
+12101,121,الخزينة الرئيسية,المركز المالي,الأستاذ العام,مدين,cash
+1210101,12101,خزينة الدولار,المركز المالي,الأستاذ المساعد,مدين,cash_usd
+1210102,12101,خزينة اليورو,المركز المالي,الأستاذ المساعد,مدين,cash_eur
+12102,121,المصرف,المركز المالي,الأستاذ العام,مدين,bank
+1210201,12102,مصرف التجارة والتنمية,المركز المالي,الأستاذ المساعد,مدين,bank_account
+1210202,12102,مصرف التجاري الوطني,المركز المالي,الأستاذ المساعد,مدين,bank_account
+1210203,12102,مصرف الوحدة,المركز المالي,الأستاذ المساعد,مدين,bank_account
+122,12,المدينون,المركز المالي,الأستاذ العام,مدين,receivable
+2,,الالتزامات,المركز المالي,الأستاذ العام,دائن,group_liability
+21,2,الالتزامات قصيرة الأجل,المركز المالي,الأستاذ العام,دائن,group_current_liability
+211,21,الموردون,المركز المالي,الأستاذ العام,دائن,payable
+212,21,أوراق الدفع,المركز المالي,الأستاذ العام,دائن,notes_payable
+213,21,ذمم دائنة,المركز المالي,الأستاذ العام,دائن,payable
+21301,213,مستحقات الصيدليات,المركز المالي,الأستاذ العام,دائن,payable
+2130101,21301,صيدلية الرحيق,المركز المالي,الأستاذ المساعد,دائن,payable_partner
+21301010001,2130101,الرحيق بلعون,المركز المالي,الأستاذ التحليلي,دائن,analytic_branch
+21301010002,2130101,الرحيق قاريونس,المركز المالي,الأستاذ التحليلي,دائن,analytic_branch
+2130102,21301,صيدلية القلعة,المركز المالي,الأستاذ المساعد,دائن,payable_partner
+2130103,21301,صيدلية الأوائل,المركز المالي,الأستاذ المساعد,دائن,payable_partner
+214,21,مصروفات مستحقة,المركز المالي,الأستاذ العام,دائن,accrued_expense
+215,21,إيرادات مقدمة,المركز المالي,الأستاذ العام,دائن,unearned_revenue
+22,2,الالتزامات طويلة الأجل,المركز المالي,الأستاذ العام,دائن,group_non_current_liability
+221,22,قروض طويلة الأجل,المركز المالي,الأستاذ العام,دائن,long_term_loan
+3,,حقوق الملكية,المركز المالي,الأستاذ العام,دائن,group_equity
+31,3,رأس المال,المركز المالي,الأستاذ العام,دائن,equity_capital
+3101,31,رأس مال الشريك أ,المركز المالي,الأستاذ المساعد,دائن,equity_partner
+3102,31,رأس مال الشريك ب,المركز المالي,الأستاذ المساعد,دائن,equity_partner
+32,3,مسحوبات شخصية,المركز المالي,الأستاذ العام,مدين,drawings
+3201,32,مسحوبات الشريك أ,المركز المالي,الأستاذ المساعد,مدين,drawings_partner
+3202,32,مسحوبات الشريك ب,المركز المالي,الأستاذ المساعد,مدين,drawings_partner
+33,3,توزيعات الأرباح والخسائر,المركز المالي,الأستاذ العام,مدين/دائن,profit_loss_distribution
+3301,33,حصة الشريك أ,المركز المالي,الأستاذ المساعد,مدين/دائن,partner_share
+3302,33,حصة الشريك ب,المركز المالي,الأستاذ المساعد,مدين/دائن,partner_share
+34,3,جاري الشركاء,المركز المالي,الأستاذ العام,مدين/دائن,partner_current
+3401,34,جاري الشريك أ,المركز المالي,الأستاذ المساعد,مدين/دائن,partner_current
+3402,34,جاري الشريك ب,المركز المالي,الأستاذ المساعد,مدين/دائن,partner_current
+35,3,الأرباح المحتجزة,المركز المالي,الأستاذ العام,دائن,retained_earnings
+4,,الإيرادات,الدخل,الأستاذ العام,دائن,group_income
+41,4,إيرادات التشغيل,الدخل,الأستاذ العام,دائن,income_operating
+411,41,إيرادات العمولات,الدخل,الأستاذ العام,دائن,income_commission
+41101,411,عمولة صيدلية الرحيق,الدخل,الأستاذ المساعد,دائن,income_commission
+411010001,41101,الرحيق بلعون,الدخل,الأستاذ التحليلي,دائن,analytic_branch
+411010002,41101,الرحيق قاريونس,الدخل,الأستاذ التحليلي,دائن,analytic_branch
+41102,411,عمولة صيدلية القلعة,الدخل,الأستاذ المساعد,دائن,income_commission
+41103,411,عمولة صيدلية الأوائل,الدخل,الأستاذ المساعد,دائن,income_commission
+412,41,إيرادات التوصيل,الدخل,الأستاذ العام,دائن,income_delivery
+413,41,خصومات وعروض ترويجية,الدخل,الأستاذ العام,مدين,contra_income_discounts
+42,4,إيرادات أخرى,الدخل,الأستاذ العام,دائن,income_other
+421,42,أرباح فروق عملة,الدخل,الأستاذ العام,دائن,fx_gain
+422,42,إيرادات متنوعة,الدخل,الأستاذ العام,دائن,income_other
+423,42,أرباح تقييم الاستثمارات,الدخل,الأستاذ العام,دائن,investment_gain
+5,,المصاريف,الدخل,الأستاذ العام,مدين,group_expense
+51,5,مصاريف التشغيل المباشر,الدخل,الأستاذ العام,مدين,expense_direct_cost
+511,51,أجور المندوبين,الدخل,الأستاذ العام,مدين,expense_direct_labor
+51101,511,أجور أساسية,الدخل,الأستاذ المساعد,مدين,expense_direct_labor
+51102,511,حوافز ومكافآت,الدخل,الأستاذ المساعد,مدين,expense_direct_labor
+512,51,مصاريف المنصة والتقنية,الدخل,الأستاذ العام,مدين,expense_tech_platform
+52,5,مصاريف التسويق والإعلان,الدخل,الأستاذ العام,مدين,expense_marketing
+521,52,إعلانات وحملات ترويجية,الدخل,الأستاذ العام,مدين,expense_marketing
+52101,521,إعلانات المواقع والمنصات الرقمية,الدخل,الأستاذ المساعد,مدين,expense_marketing
+521010001,52101,إعلانات الفيس بوك,الدخل,الأستاذ التحليلي,مدين,analytic_marketing
+52102,521,دعايات المسوقين,الدخل,الأستاذ المساعد,مدين,expense_marketing
+53,5,المصاريف الإدارية والعمومية,الدخل,الأستاذ العام,مدين,expense_admin
+531,53,الرواتب,الدخل,الأستاذ العام,مدين,expense_salaries
+53101,531,رواتب أساسية,الدخل,الأستاذ المساعد,مدين,expense_salaries
+53102,531,بدلات ومكافآت,الدخل,الأستاذ المساعد,مدين,expense_salaries
+532,53,الإيجارات,الدخل,الأستاذ العام,مدين,expense_rent
+533,53,أتعاب مهنية واستشارات,الدخل,الأستاذ العام,مدين,expense_professional_fees
+54,5,مصاريف بنكية وتحويلات,الدخل,الأستاذ العام,مدين,expense_bank_fees
+541,54,عمولات بنكية ومحافظ إلكترونية,الدخل,الأستاذ العام,مدين,expense_bank_fees
+55,5,مصاريف أخرى,الدخل,الأستاذ العام,مدين,expense_other
+551,55,خسائر فروق عملة,الدخل,الأستاذ العام,مدين,fx_loss
+552,55,مصاريف متنوعة,الدخل,الأستاذ العام,مدين,expense_other
+553,55,ديون معدومة,الدخل,الأستاذ العام,مدين,bad_debt_expense
+554,55,خسائر هبوط وتقييم استثمارات,الدخل,الأستاذ العام,مدين,investment_loss
+56,5,مصاريف استهلاك الأصول الثابتة,الدخل,الأستاذ العام,مدين,expense_depreciation
+561,56,مصروف استهلاك الآلات,الدخل,الأستاذ العام,مدين,expense_depreciation
+56101,561,مصروف استهلاك حواسيب,الدخل,الأستاذ المساعد,مدين,expense_depreciation
+561010001,56101,مصروف استهلاك حواسيب مكتبية,الدخل,الأستاذ التحليلي,مدين,analytic_depreciation
+561010002,56101,مصروف استهلاك حواسيب محمولة,الدخل,الأستاذ التحليلي,مدين,analytic_depreciation
+56102,561,مصروف استهلاك ماكينة عد الأموال,الدخل,الأستاذ المساعد,مدين,expense_depreciation
+562,56,مصروف استهلاك أثاث,الدخل,الأستاذ العام,مدين,expense_depreciation
+563,56,مصروف استهلاك سيارات,الدخل,الأستاذ العام,مدين,expense_depreciation
