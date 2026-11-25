@@ -1,20 +1,37 @@
-from datetime import date
 import sqlite3
-from typing import Dict, List, Optional, Tuple
+
+ACCOUNTS_DATA = [
+    # (code, name, ledger, account_type, statement, parent_full_code, is_postable)
+    ("1", "الأصول", "الأستاذ العام", "مدين", "المركز المالي", None, False),
+    ("11", "الأصول غير المتداولة", "الأستاذ العام", "مدين", "المركز المالي", "1", False),
+    ("111", "الأصول الثابتة", "الأستاذ العام", "مدين", "المركز المالي", "11", False),
+    ("11101", "الآلات والمعدات", "الأستاذ العام", "مدين", "المركز المالي", "111", False),
+    ("01", "حواسيب", "الأستاذ المساعد", "مدين", "المركز المالي", "11101", False),
+    ("0001", "حواسيب مكتبية", "الأستاذ التحليلي", "مدين", "المركز المالي", "11101-01", True),
+    ("0002", "حواسيب محمولة", "الأستاذ التحليلي", "مدين", "المركز المالي", "11101-01", True),
+    ("02", "ماكينة عد الأموال", "الأستاذ المساعد", "مدين", "المركز المالي", "11101", True),
+    ("12", "الأصول المتداولة", "الأستاذ العام", "مدين", "المركز المالي", "1", False),
+    ("121", "النقدية وما في حكمها", "الأستاذ العام", "مدين", "المركز المالي", "12", False),
+    ("12101", "الخزينة الرئيسية", "الأستاذ العام", "مدين", "المركز المالي", "121", False),
+    ("01", "خزينة الدولار", "الأستاذ المساعد", "مدين", "المركز المالي", "12101", True),
+    ("02", "خزينة اليورو", "الأستاذ المساعد", "مدين", "المركز المالي", "12101", True),
+    ("4", "الإيرادات", "الأستاذ العام", "دائن", "الدخل", None, False),
+    ("41", "إيرادات التشغيل", "الأستاذ العام", "دائن", "الدخل", "4", False),
+    ("411", "إيرادات العمولات", "الأستاذ العام", "دائن", "الدخل", "41", False),
+    ("01", "عمولة صيدلية الرحيق", "الأستاذ المساعد", "دائن", "الدخل", "411", False),
+    ("0001", "الرحيق بلعون", "الأستاذ التحليلي", "دائن", "الدخل", "411-01", True),
+    ("0002", "الرحيق قاريونس", "الأستاذ التحليلي", "دائن", "الدخل", "411-01", True),
+]
 
 
-class AccountingSystem:
-    """منظومة محاسبية متكاملة تدعم الدليل الهرمي، القيود المزدوجة، والتقارير المالية."""
-
-    def __init__(self, db_path: str = "erp_accounting.db"):
-        self.db_path = db_path
-        self.conn = sqlite3.connect(self.db_path)
+class ChartOfAccountsERP:
+    def __init__(self, db_path: str = ":memory:"):
+        self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON;")
-        self._create_tables()
-        self.seed_chart_of_accounts()
+        self._create_schema()
 
-    def _create_tables(self) -> None:
+    def _create_schema(self):
         with self.conn:
             self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS accounts (
@@ -22,362 +39,67 @@ class AccountingSystem:
                     code TEXT NOT NULL,
                     full_code TEXT NOT NULL UNIQUE,
                     name TEXT NOT NULL,
-                    statement TEXT NOT NULL CHECK (statement IN ('المركز المالي', 'الدخل')),
-                    ledger_type TEXT NOT NULL CHECK (ledger_type IN ('الأستاذ العام', 'الأستاذ المساعد', 'الأستاذ التحليلي')),
-                    normal_balance TEXT NOT NULL CHECK (normal_balance IN ('مدين', 'دائن', 'مدين / دائن')),
+                    ledger TEXT NOT NULL,
+                    account_type TEXT NOT NULL,
+                    statement TEXT NOT NULL,
                     parent_full_code TEXT,
-                    is_active INTEGER NOT NULL DEFAULT 1,
-                    FOREIGN KEY (parent_full_code) REFERENCES accounts(full_code) ON DELETE RESTRICT
+                    is_postable INTEGER NOT NULL DEFAULT 0,
+                    FOREIGN KEY (parent_full_code) REFERENCES accounts(full_code)
                 );
             """)
 
-            self.conn.execute("""
-                CREATE TABLE IF NOT EXISTS journal_entries (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    entry_number TEXT NOT NULL UNIQUE,
-                    entry_date TEXT NOT NULL,
-                    description TEXT NOT NULL,
-                    reference TEXT,
-                    status TEXT NOT NULL DEFAULT 'posted' CHECK (status IN ('draft', 'posted', 'reversed')),
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-
-            self.conn.execute("""
-                CREATE TABLE IF NOT EXISTS journal_lines (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    entry_id INTEGER NOT NULL,
-                    account_full_code TEXT NOT NULL,
-                    debit REAL NOT NULL DEFAULT 0.0 CHECK (debit >= 0),
-                    credit REAL NOT NULL DEFAULT 0.0 CHECK (credit >= 0),
-                    memo TEXT,
-                    FOREIGN KEY (entry_id) REFERENCES journal_entries(id) ON DELETE CASCADE,
-                    FOREIGN KEY (account_full_code) REFERENCES accounts(full_code) ON DELETE RESTRICT,
-                    CHECK ((debit > 0 AND credit = 0) OR (credit > 0 AND debit = 0))
-                );
-            """)
-
-    def add_account(
-        self,
-        code: str,
-        name: str,
-        statement: str,
-        ledger_type: str,
-        normal_balance: str,
-        parent_full_code: Optional[str] = None,
-    ) -> str:
-        full_code = f"{parent_full_code}-{code}" if parent_full_code else code
+    def add_account(self, item: tuple):
+        code, name, ledger, acc_type, stmt, parent, postable = item
+        full_code = f"{parent}-{code}" if parent else code
         with self.conn:
             self.conn.execute(
                 """
-                INSERT INTO accounts (code, full_code, name, statement, ledger_type, normal_balance, parent_full_code)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(full_code) DO UPDATE SET
-                    code = excluded.code,
-                    name = excluded.name,
-                    statement = excluded.statement,
-                    ledger_type = excluded.ledger_type,
-                    normal_balance = excluded.normal_balance,
-                    parent_full_code = excluded.parent_full_code;
+                INSERT INTO accounts (
+                    code, full_code, name, ledger,
+                    account_type, statement, parent_full_code, is_postable
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (code, full_code, name.strip(), statement, ledger_type, normal_balance, parent_full_code),
+                (
+                    code.strip(),
+                    full_code.strip(),
+                    name.strip(),
+                    ledger.strip(),
+                    acc_type.strip(),
+                    stmt.strip(),
+                    parent,
+                    1 if postable else 0,
+                ),
             )
         return full_code
 
-    def seed_chart_of_accounts(self) -> None:
-        """إدراج دليل الحسابات الكامل وفق الملف المرفق."""
-        # الصيغة: (code, name, statement, ledger_type, normal_balance, parent_full_code)
-        chart: List[Tuple[str, str, str, str, str, Optional[str]]] = [
-            # ==================== 1. الأصول ====================
-            ("1", "الأصول", "المركز المالي", "الأستاذ العام", "مدين", None),
-            # 11 الأصول غير المتداولة
-            ("11", "الأصول غير المتداولة", "المركز المالي", "الأستاذ العام", "مدين", "1"),
-            ("111", "الأصول الثابتة", "المركز المالي", "الأستاذ العام", "مدين", "11"),
-            ("11101", "الآلات والمعدات", "المركز المالي", "الأستاذ العام", "مدين", "111"),
-            ("01", "حواسيب", "المركز المالي", "الأستاذ المساعد", "مدين", "11101"),
-            ("0001", "حواسيب مكتبية", "المركز المالي", "الأستاذ التحليلي", "مدين", "11101-01"),
-            ("0002", "حواسيب محمولة", "المركز المالي", "الأستاذ التحليلي", "مدين", "11101-01"),
-            ("02", "ماكينة عد الأموال", "المركز المالي", "الأستاذ المساعد", "مدين", "11101"),
-            ("11102", "أثاث", "المركز المالي", "الأستاذ العام", "مدين", "111"),
-            ("11103", "سيارات", "المركز المالي", "الأستاذ العام", "مدين", "111"),
+    def load_accounts(self, items: list[tuple]):
+        for item in items:
+            self.add_account(item)
 
-            # 112 مجمع استهلاك الأصول الثابتة
-            ("112", "مجمع استهلاك الأصول الثابتة", "المركز المالي", "الأستاذ العام", "دائن", "11"),
-            ("11201", "مجمع استهلاك الآلات", "المركز المالي", "الأستاذ العام", "دائن", "112"),
-            ("01", "مجمع استهلاك حواسيب", "المركز المالي", "الأستاذ المساعد", "دائن", "11201"),
-            ("0001", "مجمع استهلاك حواسيب مكتبية", "المركز المالي", "الأستاذ التحليلي", "دائن", "11201-01"),
-            ("0002", "مجمع استهلاك حواسيب محمولة", "المركز المالي", "الأستاذ التحليلي", "دائن", "11201-01"),
-            ("02", "مجمع استهلاك ماكينة عد الأموال", "المركز المالي", "الأستاذ المساعد", "دائن", "11201"),
-            ("11202", "مجمع استهلاك أثاث", "المركز المالي", "الأستاذ العام", "دائن", "112"),
-            ("11203", "مجمع استهلاك سيارات", "المركز المالي", "الأستاذ العام", "دائن", "112"),
+    def print_tree(self, parent_full_code: str | None = None, indent: int = 0):
+        if parent_full_code is None:
+            rows = self.conn.execute(
+                "SELECT * FROM accounts WHERE parent_full_code IS NULL ORDER BY full_code"
+            ).fetchall()
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM accounts WHERE parent_full_code = ? ORDER BY full_code",
+                (parent_full_code,),
+            ).fetchall()
 
-            # 113 الاستثمارات
-            ("113", "الاستثمارات", "المركز المالي", "الأستاذ العام", "مدين", "11"),
-            ("11301", "استثمارات مالية", "المركز المالي", "الأستاذ العام", "مدين", "113"),
-            ("11302", "مخصص هبوط وتقييم استثمارات", "المركز المالي", "الأستاذ العام", "دائن", "113"),
+        for row in rows:
+            branch = "│   " * indent + ("├── " if indent > 0 else "")
+            flag = "[قابل للقيد]" if row["is_postable"] else "[تجميعي]"
+            print(f"{branch}{row['full_code']} | {row['name']} ({row['ledger']}) {flag}")
+            self.print_tree(row["full_code"], indent + 1)
 
-            # 12 الأصول المتداولة
-            ("12", "الأصول المتداولة", "المركز المالي", "الأستاذ العام", "مدين", "1"),
-            ("121", "النقدية وما في حكمها", "المركز المالي", "الأستاذ العام", "مدين", "12"),
-            ("12101", "الخزينة الرئيسية", "المركز المالي", "الأستاذ العام", "مدين", "121"),
-            ("01", "خزينة الدولار", "المركز المالي", "الأستاذ المساعد", "مدين", "12101"),
-            ("02", "خزينة اليورو", "المركز المالي", "الأستاذ المساعد", "مدين", "12101"),
-            ("12102", "المصرف", "المركز المالي", "الأستاذ العام", "مدين", "121"),
-            ("01", "مصرف التجارة والتنمية", "المركز المالي", "الأستاذ المساعد", "مدين", "12102"),
-            ("02", "مصرف التجاري الوطني", "المركز المالي", "الأستاذ المساعد", "مدين", "12102"),
-            ("03", "مصرف الوحدة", "المركز المالي", "الأستاذ المساعد", "مدين", "12102"),
-            ("122", "المدينون", "المركز المالي", "الأستاذ العام", "مدين", "12"),
-
-            # ==================== 2. الالتزامات ====================
-            ("2", "الالتزامات", "المركز المالي", "الأستاذ العام", "دائن", None),
-            ("21", "الالتزامات قصيرة الأجل", "المركز المالي", "الأستاذ العام", "دائن", "2"),
-            ("211", "الموردون", "المركز المالي", "الأستاذ العام", "دائن", "21"),
-            ("212", "أوراق الدفع", "المركز المالي", "الأستاذ العام", "دائن", "21"),
-            ("213", "ذمم دائنة", "المركز المالي", "الأستاذ العام", "دائن", "21"),
-            ("21301", "مستحقات الصيدليات", "المركز المالي", "الأستاذ العام", "دائن", "213"),
-            ("01", "صيدلية الرحيق", "المركز المالي", "الأستاذ المساعد", "دائن", "21301"),
-            ("0001", "الرحيق بلعون", "المركز المالي", "الأستاذ التحليلي", "دائن", "21301-01"),
-            ("0002", "الرحيق قاريونس", "المركز المالي", "الأستاذ التحليلي", "دائن", "21301-01"),
-            ("02", "صيدلية القلعة", "المركز المالي", "الأستاذ المساعد", "دائن", "21301"),
-            ("03", "صيدلية الأوائل", "المركز المالي", "الأستاذ المساعد", "دائن", "21301"),
-            ("214", "مصروفات مستحقة", "المركز المالي", "الأستاذ العام", "دائن", "21"),
-            ("215", "إيرادات مقدمة", "المركز المالي", "الأستاذ العام", "دائن", "21"),
-
-            ("22", "الالتزامات طويلة الأجل", "المركز المالي", "الأستاذ العام", "دائن", "2"),
-            ("221", "قروض طويلة الأجل", "المركز المالي", "الأستاذ العام", "دائن", "22"),
-
-            # ==================== 3. حقوق الملكية ====================
-            ("3", "حقوق الملكية", "المركز المالي", "الأستاذ العام", "دائن", None),
-            ("31", "رأس المال", "المركز المالي", "الأستاذ العام", "دائن", "3"),
-            ("01", "رأس مال الشريك أ", "المركز المالي", "الأستاذ المساعد", "دائن", "31"),
-            ("02", "رأس مال الشريك ب", "المركز المالي", "الأستاذ المساعد", "دائن", "31"),
-
-            ("32", "مسحوبات شخصية", "المركز المالي", "الأستاذ العام", "مدين", "3"),
-            ("01", "مسحوبات الشريك", "المركز المالي", "الأستاذ المساعد", "مدين", "32"),
-            ("02", "مسحوبات الشريك ب", "المركز المالي", "الأستاذ المساعد", "مدين", "32"),
-
-            ("33", "توزيعات الأرباح والخسائر", "المركز المالي", "الأستاذ العام", "مدين / دائن", "3"),
-            ("01", "حصة الشريك أ", "المركز المالي", "الأستاذ المساعد", "مدين / دائن", "33"),
-            ("02", "حصة الشريك ب", "المركز المالي", "الأستاذ المساعد", "مدين / دائن", "33"),
-
-            ("34", "جاري الشركاء", "المركز المالي", "الأستاذ العام", "مدين / دائن", "3"),
-            ("01", "جاري الشريك أ", "المركز المالي", "الأستاذ المساعد", "مدين / دائن", "34"),
-            ("02", "جاري الشريك ب", "المركز المالي", "الأستاذ المساعد", "مدين / دائن", "34"),
-
-            ("35", "الأرباح المحتجزة", "المركز المالي", "الأستاذ العام", "دائن", "3"),
-
-            # ==================== 4. الإيرادات ====================
-            ("4", "الإيرادات", "الدخل", "الأستاذ العام", "دائن", None),
-            ("41", "إيرادات التشغيل", "الدخل", "الأستاذ العام", "دائن", "4"),
-            ("411", "إيرادات العمولات", "الدخل", "الأستاذ العام", "دائن", "41"),
-            ("01", "عمولة صيدلية الرحيق", "الدخل", "الأستاذ المساعد", "دائن", "411"),
-            ("0001", "الرحيق بلعون", "الدخل", "الأستاذ التحليلي", "دائن", "411-01"),
-            ("0002", "الرحيق قاريونس", "الدخل", "الأستاذ التحليلي", "دائن", "411-01"),
-            ("02", "عمولة صيدلية القلعة", "الدخل", "الأستاذ المساعد", "دائن", "411"),
-            ("03", "عمولة صيدلية الأوائل", "الدخل", "الأستاذ المساعد", "دائن", "411"),
-            ("412", "إيرادات التوصيل", "الدخل", "الأستاذ العام", "دائن", "41"),
-            ("413", "خصومات وعروض ترويجية", "الدخل", "الأستاذ العام", "مدين", "41"),
-
-            ("42", "إيرادات أخرى", "الدخل", "الأستاذ العام", "دائن", "4"),
-            ("421", "أرباح فروق عملة", "الدخل", "الأستاذ العام", "دائن", "42"),
-            ("422", "إيرادات متنوعة", "الدخل", "الأستاذ العام", "دائن", "42"),
-            ("423", "أرباح تقييم الاستثمارات", "الدخل", "الأستاذ العام", "دائن", "42"),
-
-            # ==================== 5. المصروفات ====================
-            ("5", "المصاريف", "الدخل", "الأستاذ العام", "مدين", None),
-            ("51", "مصاريف التشغيل المباشر", "الدخل", "الأستاذ العام", "مدين", "5"),
-            ("511", "أجور المندوبين", "الدخل", "الأستاذ العام", "مدين", "51"),
-            ("01", "أجور أساسية", "الدخل", "الأستاذ المساعد", "مدين", "511"),
-            ("02", "حوافز ومكافآت", "الدخل", "الأستاذ المساعد", "مدين", "511"),
-            ("512", "مصاريف المنصة والتقنية", "الدخل", "الأستاذ العام", "مدين", "51"),
-
-            ("52", "مصاريف التسويق والإعلان", "الدخل", "الأستاذ العام", "مدين", "5"),
-            ("521", "إعلانات وحملات ترويجية", "الدخل", "الأستاذ العام", "مدين", "52"),
-            ("01", "إعلانات المواقع والمنصات الرقمية", "الدخل", "الأستاذ المساعد", "مدين", "521"),
-            ("0001", "إعلانات الفيس بوك", "الدخل", "الأستاذ التحليلي", "مدين", "521-01"),
-            ("02", "دعايات المسوقين", "الدخل", "الأستاذ المساعد", "مدين", "521"),
-
-            ("53", "المصاريف الإدارية والعمومية", "الدخل", "الأستاذ العام", "مدين", "5"),
-            ("531", "الرواتب", "الدخل", "الأستاذ العام", "مدين", "53"),
-            ("01", "رواتب أساسية", "الدخل", "الأستاذ المساعد", "مدين", "531"),
-            ("02", "بدلات ومكافآت", "الدخل", "الأستاذ المساعد", "مدين", "531"),
-            ("532", "الإيجارات", "الدخل", "الأستاذ العام", "مدين", "53"),
-            ("533", "أتعاب مهنية واستشارات", "الدخل", "الأستاذ العام", "مدين", "53"),
-
-            ("54", "مصاريف بنكية وتحويلات", "الدخل", "الأستاذ العام", "مدين", "5"),
-            ("541", "عمولات بنكية ومحافظ إلكترونية", "الدخل", "الأستاذ العام", "مدين", "54"),
-
-            ("55", "مصاريف أخرى", "الدخل", "الأستاذ العام", "مدين", "5"),
-            ("551", "خسائر فروق عملة", "الدخل", "الأستاذ العام", "مدين", "55"),
-            ("552", "مصاريف متنوعة", "الدخل", "الأستاذ العام", "مدين", "55"),
-            ("553", "ديون معدومة", "الدخل", "الأستاذ العام", "مدين", "55"),
-            ("554", "خسائر هبوط وتقييم استثمارات", "الدخل", "الأستاذ العام", "مدين", "55"),
-
-            ("56", "مصاريف استهلاك الأصول الثابتة", "الدخل", "الأستاذ العام", "مدين", "5"),
-            ("561", "مصروف استهلاك الآلات", "الدخل", "الأستاذ العام", "مدين", "56"),
-            ("01", "مصروف استهلاك حواسيب", "الدخل", "الأستاذ المساعد", "مدين", "561"),
-            ("0001", "مصروف استهلاك حواسيب مكتبية", "الدخل", "الأستاذ التحليلي", "مدين", "561-01"),
-            ("0002", "مصروف استهلاك حواسيب محمولة", "الدخل", "الأستاذ التحليلي", "مدين", "561-01"),
-            ("02", "مصروف استهلاك ماكينة عد الأموال", "الدخل", "الأستاذ المساعد", "مدين", "561"),
-            ("562", "مصروف استهلاك أثاث", "الدخل", "الأستاذ العام", "مدين", "56"),
-            ("563", "مصروف استهلاك سيارات", "الدخل", "الأستاذ العام", "مدين", "56"),
-        ]
-
-        for code, name, statement, ledger_type, normal_balance, parent in chart:
-            self.add_account(code, name, statement, ledger_type, normal_balance, parent)
-
-    def _has_children(self, full_code: str) -> bool:
-        row = self.conn.execute(
-            "SELECT 1 FROM accounts WHERE parent_full_code = ? LIMIT 1", (full_code,)
-        ).fetchone()
-        return row is not None
-
-    def post_journal_entry(
-        self,
-        entry_number: str,
-        description: str,
-        lines: List[Dict],
-        entry_date: Optional[str] = None,
-        reference: Optional[str] = None,
-        allow_parent_posting: bool = False,
-    ) -> int:
-        """
-        ترحيل قيد محاسبي مزدوج مع التحقق من:
-        1) توازن المدين والدائن.
-        2) وجود الحساب وفعاليته.
-        3) منع الترحيل على حساب تجميعي له أبناء (إلا إذا تم السماح صراحة).
-        """
-        entry_date = entry_date or date.today().isoformat()
-        total_debit = round(sum(float(l.get("debit", 0.0)) for l in lines), 4)
-        total_credit = round(sum(float(l.get("credit", 0.0)) for l in lines), 4)
-
-        if not lines or total_debit <= 0 or total_credit <= 0:
-            raise ValueError("يجب أن يحتوي القيد على أطراف مدينة ودائنة بقيمة أكبر من الصفر.")
-        if total_debit != total_credit:
-            raise ValueError(f"القيد غير متوازن: المدين ({total_debit}) != الدائن ({total_credit}).")
-
-        for line in lines:
-            acc_code = line["account_full_code"]
-            acc = self.conn.execute(
-                "SELECT full_code, name, is_active FROM accounts WHERE full_code = ?", (acc_code,)
-            ).fetchone()
-            if not acc or not acc["is_active"]:
-                raise ValueError(f"الحساب ({acc_code}) غير موجود أو غير نشط.")
-            if not allow_parent_posting and self._has_children(acc_code):
-                raise ValueError(
-                    f"لا يمكن الترحيل المباشر على الحساب التجميعي ({acc['full_code']} - {acc['name']}) لوجود حسابات فرعية تحته."
-                )
-
-        with self.conn:
-            cur = self.conn.execute(
-                """
-                INSERT INTO journal_entries (entry_number, entry_date, description, reference, status)
-                VALUES (?, ?, ?, ?, 'posted');
-                """,
-                (entry_number, entry_date, description, reference),
-            )
-            entry_id = cur.lastrowid
-            for line in lines:
-                self.conn.execute(
-                    """
-                    INSERT INTO journal_lines (entry_id, account_full_code, debit, credit, memo)
-                    VALUES (?, ?, ?, ?, ?);
-                    """,
-                    (
-                        entry_id,
-                        line["account_full_code"],
-                        round(float(line.get("debit", 0.0)), 4),
-                        round(float(line.get("credit", 0.0)), 4),
-                        line.get("memo", ""),
-                    ),
-                )
-        return entry_id
-
-    def get_direct_movements(self) -> Dict[str, Tuple[float, float]]:
-        rows = self.conn.execute("""
-            SELECT jl.account_full_code,
-                   COALESCE(SUM(jl.debit), 0.0) AS debit_sum,
-                   COALESCE(SUM(jl.credit), 0.0) AS credit_sum
-            FROM journal_lines jl
-            JOIN journal_entries je ON je.id = jl.entry_id
-            WHERE je.status = 'posted'
-            GROUP BY jl.account_full_code;
-        """).fetchall()
-        return {r["account_full_code"]: (r["debit_sum"], r["credit_sum"]) for r in rows}
-
-    def get_trial_balance(self, rollup_parents: bool = True) -> List[Dict]:
-        """استخراج ميزان المراجعة مع إمكانية تجميع أرصدة الحسابات الأب."""
-        accounts = self.conn.execute("SELECT * FROM accounts ORDER BY full_code;").fetchall()
-        direct = self.get_direct_movements()
-
-        # بناء خريطة الأبناء لتجميع الأرصدة من الأسفل إلى الأعلى
-        children_map: Dict[Optional[str], List[str]] = {}
-        acc_map: Dict[str, sqlite3.Row] = {}
-        for a in accounts:
-            acc_map[a["full_code"]] = a
-            children_map.setdefault(a["parent_full_code"], []).append(a["full_code"])
-
-        def compute_totals(code: str) -> Tuple[float, float]:
-            d, c = direct.get(code, (0.0, 0.0))
-            if rollup_parents:
-                for child_code in children_map.get(code, []):
-                    cd, cc = compute_totals(child_code)
-                    d += cd
-                    c += cc
-            return round(d, 2), round(c, 2)
-
-        report = []
-        for a in accounts:
-            fc = a["full_code"]
-            debit_total, credit_total = compute_totals(fc)
-            net = round(debit_total - credit_total, 2)
-            report.append({
-                "full_code": fc,
-                "code": a["code"],
-                "name": a["name"],
-                "statement": a["statement"],
-                "ledger_type": a["ledger_type"],
-                "normal_balance": a["normal_balance"],
-                "debit": debit_total,
-                "credit": credit_total,
-                "net_debit": max(net, 0.0),
-                "net_credit": abs(min(net, 0.0)),
-            })
-        return report
-
-    def print_chart_tree(self) -> None:
-        rows = self.conn.execute("SELECT * FROM accounts ORDER BY full_code;").fetchall()
-        print("\n=== دليل الحسابات الهيكلي ===")
-        for r in rows:
-            depth = r["full_code"].count("-")
-            indent = "  " * depth
-            print(
-                f"{indent}[{r['full_code']}] {r['name']} | "
-                f"{r['statement']} | {r['ledger_type']} | طبيعة: {r['normal_balance']}"
-            )
+    def close(self):
+        self.conn.close()
 
 
-# ==================== مثال عملي للتشغيل ====================
 if __name__ == "__main__":
-    erp = AccountingSystem(":memory:")  # استخدم مسار ملف مثل "accounting.db" للحفظ الدائم
-    erp.print_chart_tree()
-
-    # مثال قيد: استلام عمولة من الرحيق بلعون في مصرف التجارة والتنمية
-    erp.post_journal_entry(
-        entry_number="JV-2026-0001",
-        description="تحصيل عمولة صيدلية الرحيق - فرع بلعون",
-        reference="INV-101",
-        lines=[
-            {"account_full_code": "12102-01", "debit": 1500.0, "memo": "إيداع في مصرف التجارة والتنمية"},
-            {"account_full_code": "411-01-0001", "credit": 1500.0, "memo": "عمولة الرحيق بلعون"},
-        ],
-    )
-
-    print("\n=== الحسابات ذات الحركة الفعلية في ميزان المراجعة ===")
-    for row in erp.get_trial_balance(rollup_parents=True):
-        if row["debit"] > 0 or row["credit"] > 0:
-            print(
-                f"{row['full_code']} - {row['name']} ({row['ledger_type']}): "
-                f"مدين={row['debit']} | دائن={row['credit']} | "
-                f"رصيد مدين={row['net_debit']} | رصيد دائن={row['net_credit']}"
-            )
+    erp = ChartOfAccountsERP(":memory:")
+    erp.load_accounts(ACCOUNTS_DATA)
+    erp.print_tree()
+    erp.close()
