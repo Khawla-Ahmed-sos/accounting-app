@@ -1,361 +1,766 @@
-from __future__ import annotations
-from dataclasses import dataclass, field
-from datetime import date
-from enum import Enum
-from typing import Dict, List, Optional
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>منظومة ERP للأدوية والتوصيل والمحاسبة</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --primary: #0f766e;
+      --primary-dark: #115e59;
+      --accent: #2563eb;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --success: #16a34a;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --radius: 12px;
+    }
 
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.5; }
 
-class AccountType(str, Enum):
-    ASSET = "أصول"            # Assets
-    LIABILITY = "خصوم"        # Liabilities
-    EQUITY = "حقوق ملكية"      # Equity
-    REVENUE = "إيرادات"        # Revenue
-    EXPENSE = "مصروفات"        # Expenses
+    header {
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+      color: #fff;
+      padding: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+    header h1 { margin: 0; font-size: 1.15rem; }
+    header p { margin: 4px 0 0; font-size: 0.8rem; opacity: 0.9; }
 
+    .tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 10px 16px;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 72px;
+      z-index: 40;
+    }
+    .tab-btn {
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
 
-class NormalSide(str, Enum):
-    DEBIT = "مدين"
-    CREDIT = "دائن"
+    main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    .section { display: none; }
+    .section.active { display: block; }
 
+    .grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    @media (min-width: 768px) {
+      .grid-2 { grid-template-columns: repeat(2, 1fr); }
+      .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    }
 
-@dataclass
-class Account:
-    code: str
-    name: str
-    account_type: AccountType
-    normal_side: NormalSide
-    parent_code: Optional[str] = None
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    }
+    .card h2, .card h3 { margin: 0 0 12px; font-size: 1rem; color: var(--primary-dark); }
 
+    .kpi-val { font-size: 1.25rem; font-weight: 800; margin-top: 4px; }
+    .kpi-label { font-size: 0.78rem; color: var(--muted); }
 
-@dataclass
-class JournalLine:
-    account_code: str
-    debit: float = 0.0
-    credit: float = 0.0
-    memo: str = ""
+    input, select, button {
+      font-size: 0.9rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      padding: 9px 12px;
+    }
+    input, select { width: 100%; background: #fff; color: var(--text); }
+    input:focus, select:focus { outline: 2px solid rgba(15, 118, 110, 0.25); border-color: var(--primary); }
 
+    .btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+    .btn:hover { background: var(--primary-dark); }
+    .btn-secondary { background: var(--accent); }
+    .btn-danger { background: var(--danger); padding: 6px 10px; font-size: 0.8rem; }
+    .btn-sm { padding: 6px 10px; font-size: 0.8rem; }
 
-@dataclass
-class JournalEntry:
-    entry_id: str
-    entry_date: date
-    description: str
-    reference: str
-    lines: List[JournalLine] = field(default_factory=list)
+    .form-row { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 10px; }
+    @media (min-width: 600px) {
+      .form-row-2 { grid-template-columns: 1fr 1fr; }
+      .form-row-3 { grid-template-columns: 2fr 1fr 1fr; }
+    }
 
-    def validate(self) -> None:
-        if not self.lines:
-            raise ValueError(f"القيد {self.entry_id} لا يحتوي على أي سطور.")
-        total_debit = round(sum(line.debit for line in self.lines), 2)
-        total_credit = round(sum(line.credit for line in self.lines), 2)
-        if total_debit <= 0 or total_credit <= 0:
-            raise ValueError(f"قيم القيد {self.entry_id} يجب أن تكون أكبر من الصفر.")
-        if total_debit != total_credit:
-            raise ValueError(
-                f"القيد {self.entry_id} غير متوازن! مدين={total_debit} بينما دائن={total_credit}"
-            )
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: right; }
+    th { background: #f8fafc; font-weight: 700; color: #334155; }
 
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .b-pending { background: #fef3c7; color: #92400e; }
+    .b-transit { background: #dbeafe; color: #1e40af; }
+    .b-delivered { background: #dcfce7; color: #166534; }
 
-class PharmacyDeliveryERP:
-    def __init__(self) -> None:
-        self.accounts: Dict[str, Account] = {}
-        self.journal_entries: List[JournalEntry] = []
-        self._init_chart_of_accounts()
+    .cart-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px dashed var(--border);
+      font-size: 0.88rem;
+      gap: 8px;
+    }
+    .balanced { color: var(--success); font-weight: 700; }
+    .unbalanced { color: var(--danger); font-weight: 700; }
+    .muted { color: var(--muted); font-size: 0.82rem; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
 
-    def _init_chart_of_accounts(self) -> None:
-        """دليل الحسابات (Chart of Accounts) مستوحى من معايير ERP."""
-        coa = [
-            # 1xxx: الأصول (Assets) - طبيعتها مدين
-            Account("1000", "الأصول المتداولة", AccountType.ASSET, NormalSide.DEBIT),
-            Account("1101", "الصندوق (النقدية)", AccountType.ASSET, NormalSide.DEBIT, "1000"),
-            Account("1102", "البنك / بوابة الدفع الإلكتروني", AccountType.ASSET, NormalSide.DEBIT, "1000"),
-            Account("1201", "ذمم العملاء المدينة", AccountType.ASSET, NormalSide.DEBIT, "1000"),
-            Account("1301", "مخزون الأدوية (في حال البيع المباشر)", AccountType.ASSET, NormalSide.DEBIT, "1000"),
+<header>
+  <h1>منظومة ERP للأدوية والتوصيل والمحاسبة</h1>
+  <p>متوافقة مع معايير القيد المزدوج ودليل الحسابات (Odoo / SAP / إكسترا / السراج)</p>
+</header>
 
-            # 2xxx: الخصوم / الالتزامات (Liabilities) - طبيعتها دائن
-            Account("2000", "الخصوم المتداولة", AccountType.LIABILITY, NormalSide.CREDIT),
-            Account("2101", "مستحقات الصيدليات الشريكة (الدائنون)", AccountType.LIABILITY, NormalSide.CREDIT, "2000"),
-            Account("2102", "الموردون (موردو الأدوية)", AccountType.LIABILITY, NormalSide.CREDIT, "2000"),
-            Account("2201", "ضريبة القيمة المضافة المستحقة", AccountType.LIABILITY, NormalSide.CREDIT, "2000"),
+<nav class="tabs">
+  <button class="tab-btn active" onclick="switchTab('orders', this)">الأدوية والتوصيل</button>
+  <button class="tab-btn" onclick="switchTab('coa', this)">دليل الحسابات</button>
+  <button class="tab-btn" onclick="switchTab('journal', this)">القيود والأستاذ</button>
+  <button class="tab-btn" onclick="switchTab('statements', this)">القوائم المالية</button>
+</nav>
 
-            # 3xxx: حقوق الملكية (Equity) - طبيعتها دائن
-            Account("3000", "حقوق الملكية", AccountType.EQUITY, NormalSide.CREDIT),
-            Account("3101", "رأس المال", AccountType.EQUITY, NormalSide.CREDIT, "3000"),
-            Account("3201", "الأرباح المحتجزة / صافي الفترة", AccountType.EQUITY, NormalSide.CREDIT, "3000"),
+<main>
+  <!-- 1. الأدوية والتوصيل -->
+  <section id="orders" class="section active">
+    <div class="grid grid-4" style="margin-bottom: 14px;">
+      <div class="card">
+        <div class="kpi-label">قيمة مخزون الأدوية (تكلفة)</div>
+        <div class="kpi-val" id="kpi-stock-cost">0.00</div>
+      </div>
+      <div class="card">
+        <div class="kpi-label">إجمالي المبيعات</div>
+        <div class="kpi-val" id="kpi-sales">0.00</div>
+      </div>
+      <div class="card">
+        <div class="kpi-label">طلبات التوصيل النشطة</div>
+        <div class="kpi-val" id="kpi-active-deliveries">0</div>
+      </div>
+      <div class="card">
+        <div class="kpi-label">صافي الربح</div>
+        <div class="kpi-val" id="kpi-net-profit">0.00</div>
+      </div>
+    </div>
 
-            # 4xxx: الإيرادات (Revenue) - طبيعتها دائن
-            Account("4000", "الإيرادات", AccountType.REVENUE, NormalSide.CREDIT),
-            Account("4101", "إيراد عمولات طلبات الأدوية", AccountType.REVENUE, NormalSide.CREDIT, "4000"),
-            Account("4102", "إيراد رسوم التوصيل", AccountType.REVENUE, NormalSide.CREDIT, "4000"),
-            Account("4103", "إيراد مبيعات الأدوية المباشرة", AccountType.REVENUE, NormalSide.CREDIT, "4000"),
+    <div class="grid grid-2">
+      <!-- البحث عن الأدوية -->
+      <div class="card">
+        <h2>بحث الأدوية والمخزون</h2>
+        <div class="form-row form-row-2">
+          <input type="text" id="med-search" placeholder="ابحث بالاسم التجاري، المادة الفعالة، أو الكود..." oninput="renderMedicines()" />
+          <select id="med-filter" onchange="renderMedicines()">
+            <option value="all">جميع الأصناف</option>
+            <option value="available">متوفر بالمخزون</option>
+            <option value="low">منخفض المخزون (أقل من 15)</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>الدواء / الدُفعة</th>
+                <th>السعر</th>
+                <th>المتاح</th>
+                <th>إجراء</th>
+              </tr>
+            </thead>
+            <tbody id="med-tbody"></tbody>
+          </table>
+        </div>
+      </div>
 
-            # 5xxx: المصروفات (Expenses) - طبيعتها مدين
-            Account("5000", "المصروفات", AccountType.EXPENSE, NormalSide.DEBIT),
-            Account("5101", "تكلفة الأدوية المباعة (COGS)", AccountType.EXPENSE, NormalSide.DEBIT, "5000"),
-            Account("5201", "مصاريف التوصيل ومستحقات المناديب", AccountType.EXPENSE, NormalSide.DEBIT, "5000"),
-            Account("5202", "عمولات بوابات الدفع والرسوم البنكية", AccountType.EXPENSE, NormalSide.DEBIT, "5000"),
-            Account("5203", "رواتب وأجور التشغيل والدعم", AccountType.EXPENSE, NormalSide.DEBIT, "5000"),
-            Account("5204", "مصاريف تسويق وتبريد/تغليف طبي", AccountType.EXPENSE, NormalSide.DEBIT, "5000"),
+      <!-- سلة الطلب والتوصيل -->
+      <div class="card">
+        <h2>طلب جديد وتوصيل للزبون</h2>
+        <div id="cart-list" style="margin-bottom: 12px;"></div>
+        <div class="form-row form-row-2">
+          <input type="text" id="cust-name" placeholder="اسم الزبون أو الصيدلية" />
+          <input type="text" id="cust-phone" placeholder="رقم الهاتف" />
+        </div>
+        <div class="form-row form-row-3">
+          <input type="text" id="cust-address" placeholder="عنوان التوصيل والمنطقة" />
+          <input type="number" id="delivery-fee" placeholder="أجرة التوصيل" value="5" min="0" step="0.5" oninput="renderCart()" />
+          <select id="payment-method">
+            <option value="cash">نقداً عند الاستلام (1111 الصندوق)</option>
+            <option value="receivable">آجل / ذمم مدينة (1121 العملاء)</option>
+          </select>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-weight:700; margin: 10px 0;">
+          <span>الإجمالي شامل التوصيل:</span>
+          <span id="cart-total">0.00</span>
+        </div>
+        <button class="btn" style="width:100%;" onclick="submitOrder()">اعتماد الطلب وترحيل القيد المحاسبي</button>
+      </div>
+    </div>
+
+    <!-- جدول طلبات التوصيل -->
+    <div class="card" style="margin-top: 14px;">
+      <div class="toolbar">
+        <h2 style="margin:0;">سجل طلبات التوصيل</h2>
+        <button class="btn btn-sm btn-secondary" onclick="resetDemoData()">إعادة ضبط البيانات التجريبية</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>رقم الطلب</th>
+              <th>الزبون والعنوان</th>
+              <th>الأصناف</th>
+              <th>الإجمالي</th>
+              <th>حالة التوصيل</th>
+              <th>تحديث الحالة</th>
+            </tr>
+          </thead>
+          <tbody id="orders-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. دليل الحسابات -->
+  <section id="coa" class="section">
+    <div class="card">
+      <div class="toolbar">
+        <div>
+          <h2 style="margin:0;">دليل الحسابات (Chart of Accounts)</h2>
+          <span class="muted">هيكلة رقمية قياسية: 1 الأصول | 2 الالتزامات | 3 حقوق الملكية | 4 الإيرادات | 5 المصروفات</span>
+        </div>
+      </div>
+
+      <div class="form-row form-row-3">
+        <input type="text" id="new-acc-code" placeholder="رقم الحساب (مثال: 1112)" />
+        <input type="text" id="new-acc-name" placeholder="اسم الحساب (مثال: عهدة مندوب التوصيل)" />
+        <select id="new-acc-type">
+          <option value="Asset">أصول (Asset)</option>
+          <option value="Liability">التزامات (Liability)</option>
+          <option value="Equity">حقوق ملكية (Equity)</option>
+          <option value="Revenue">إيرادات (Revenue)</option>
+          <option value="Expense">مصروفات / تكلفة (Expense)</option>
+        </select>
+      </div>
+      <button class="btn btn-sm" style="margin-bottom: 14px;" onclick="addAccount()">+ إضافة حساب جديد</button>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>رمز الحساب</th>
+              <th>اسم الحساب</th>
+              <th>التصنيف</th>
+              <th>الطبيعة المحاسبية</th>
+              <th>الرصيد الحالي</th>
+            </tr>
+          </thead>
+          <tbody id="coa-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. القيود والأستاذ العام -->
+  <section id="journal" class="section">
+    <div class="grid grid-2">
+      <div class="card">
+        <h2>القيود اليومية المزدوجة (Journal Entries)</h2>
+        <div id="journal-list"></div>
+      </div>
+
+      <div class="card">
+        <h2>ميزان المراجعة (Trial Balance)</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>الحساب</th>
+                <th>مدين (Debit)</th>
+                <th>دائن (Credit)</th>
+              </tr>
+            </thead>
+            <tbody id="tb-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. القوائم المالية -->
+  <section id="statements" class="section">
+    <div class="grid grid-2">
+      <div class="card">
+        <h2>قائمة الدخل (Income Statement)</h2>
+        <table>
+          <tbody id="is-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>المركز المالي / الميزانية العمومية (Balance Sheet)</h2>
+        <table>
+          <tbody id="bs-tbody"></tbody>
+        </table>
+        <div id="bs-check" style="margin-top: 10px; font-size: 0.88rem;"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const STORAGE_KEY = "PHARMA_ERP_STATE_V1";
+
+  const INITIAL_STATE = {
+    accounts: [
+      { code: "1111", name: "الصندوق النقدي", type: "Asset", normal: "Debit" },
+      { code: "1121", name: "العملاء (الذمم المدينة)", type: "Asset", normal: "Debit" },
+      { code: "1131", name: "مخزون الأدوية", type: "Asset", normal: "Debit" },
+      { code: "2111", name: "الموردون (الذمم الدائنة)", type: "Liability", normal: "Credit" },
+      { code: "3111", name: "رأس المال", type: "Equity", normal: "Credit" },
+      { code: "4111", name: "إيرادات مبيعات الأدوية", type: "Revenue", normal: "Credit" },
+      { code: "4121", name: "إيرادات رسوم التوصيل", type: "Revenue", normal: "Credit" },
+      { code: "5111", name: "تكلفة البضاعة المباعة (COGS)", type: "Expense", normal: "Debit" },
+      { code: "5211", name: "مصاريف التوصيل والتشغيل", type: "Expense", normal: "Debit" }
+    ],
+    medicines: [
+      { id: "MED-101", name: "أموكسيسيلين 500mg كبسول", active: "Amoxicillin", batch: "B26-01", exp: "2027-08", cost: 4.5, price: 7.0, qty: 45 },
+      { id: "MED-102", name: "باراسيتامول 500mg أقراص", active: "Paracetamol", batch: "B26-04", exp: "2028-02", cost: 1.5, price: 3.0, qty: 120 },
+      { id: "MED-103", name: "أوميبرازول 20mg كبسول", active: "Omeprazole", batch: "B26-09", exp: "2027-11", cost: 6.0, price: 10.0, qty: 12 },
+      { id: "MED-104", name: "إنسولين جلارجين قلم", active: "Insulin Glargine", batch: "B26-12", exp: "2027-05", cost: 18.0, price: 26.0, qty: 8 }
+    ],
+    journal: [
+      {
+        id: "JE-1001",
+        date: "2026-11-01",
+        ref: "OP-001",
+        desc: "قيد افتتاحي: تأسيس رأس المال وشراء مخزون أدوية نقداً",
+        lines: [
+          { acc: "1111", debit: 5000, credit: 0 },
+          { acc: "3111", debit: 0, credit: 5000 },
+          { acc: "1131", debit: 1300, credit: 0 },
+          { acc: "1111", debit: 0, credit: 1300 }
         ]
-        for acc in coa:
-            self.accounts[acc.code] = acc
+      }
+    ],
+    orders: [],
+    cart: []
+  };
 
-    def post_journal_entry(self, entry: JournalEntry) -> None:
-        """ترحيل قيد يومية بعد التحقق من وجود الحسابات وتوازن القيد."""
-        for line in entry.lines:
-            if line.account_code not in self.accounts:
-                raise KeyError(f"رمز الحساب غير موجود في دليل الحسابات: {line.account_code}")
-        entry.validate()
-        self.journal_entries.append(entry)
+  let state = loadState();
 
-    def get_account_balance(self, account_code: str) -> float:
-        """حساب رصيد حساب واحد بناءً على طبيعته المحاسبية."""
-        acc = self.accounts[account_code]
-        debit_sum = sum(l.debit for e in self.journal_entries for l in e.lines if l.account_code == account_code)
-        credit_sum = sum(l.credit for e in self.journal_entries for l in e.lines if l.account_code == account_code)
-        if acc.normal_side == NormalSide.DEBIT:
-            return round(debit_sum - credit_sum, 2)
-        return round(credit_sum - debit_sum, 2)
+  function loadState() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : structuredClone(INITIAL_STATE);
+    } catch {
+      return structuredClone(INITIAL_STATE);
+    }
+  }
 
-    def get_account_movement(self, account_code: str) -> tuple[float, float]:
-        """إرجاع (إجمالي المدين، إجمالي الدائن) لحساب معين."""
-        debit_sum = round(sum(l.debit for e in self.journal_entries for l in e.lines if l.account_code == account_code), 2)
-        credit_sum = round(sum(l.credit for e in self.journal_entries for l in e.lines if l.account_code == account_code), 2)
-        return debit_sum, credit_sum
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
 
-    # ------------------------------------------------------------------
-    # دوال المعاملات التجارية لمنصة توصيل الأدوية (Business Transactions)
-    # ------------------------------------------------------------------
+  function resetDemoData() {
+    state = structuredClone(INITIAL_STATE);
+    saveState();
+    renderAll();
+  }
 
-    def capital_injection(self, entry_id: str, d: date, amount: float, to_bank: bool = True) -> None:
-        """1) إيداع رأس المال في البنك أو الصندوق."""
-        target_acc = "1102" if to_bank else "1101"
-        self.post_journal_entry(JournalEntry(
-            entry_id=entry_id,
-            entry_date=d,
-            description="إيداع رأس مال لتأسيس وتشغيل منصة الأدوية",
-            reference="CAP-001",
-            lines=[
-                JournalLine(target_acc, debit=amount, memo="إيداع رأس المال"),
-                JournalLine("3101", credit=amount, memo="رأس المال المدفوع"),
-            ]
-        ))
+  function switchTab(tabId, btn) {
+    document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.getElementById(tabId).classList.add("active");
+    btn.classList.add("active");
+    renderAll();
+  }
 
-    def record_marketplace_order(
-        self,
-        entry_id: str,
-        d: date,
-        order_ref: str,
-        medicine_amount: float,
-        delivery_fee: float,
-        commission_rate: float = 0.15,
-        paid_online: bool = True,
-    ) -> None:
-        """
-        2) تسجيل طلب دواء عبر صيدلية شريكة (نموذج العمولة والتوصيل):
-        - إجمالي ما يدفعه العميل = قيمة الدواء + رسوم التوصيل.
-        - عمولة المنصة = نسبة من قيمة الدواء.
-        - مستحق الصيدلية = قيمة الدواء - عمولة المنصة.
-        """
-        customer_total = round(medicine_amount + delivery_fee, 2)
-        platform_commission = round(medicine_amount * commission_rate, 2)
-        pharmacy_payable = round(medicine_amount - platform_commission, 2)
-        collection_acc = "1102" if paid_online else "1201"
+  function getAccountBalances() {
+    const map = {};
+    state.accounts.forEach(a => {
+      map[a.code] = { ...a, debit: 0, credit: 0, balance: 0 };
+    });
+    state.journal.forEach(entry => {
+      entry.lines.forEach(l => {
+        if (!map[l.acc]) return;
+        map[l.acc].debit += Number(l.debit || 0);
+        map[l.acc].credit += Number(l.credit || 0);
+      });
+    });
+    Object.values(map).forEach(acc => {
+      acc.balance = acc.normal === "Debit"
+        ? acc.debit - acc.credit
+        : acc.credit - acc.debit;
+    });
+    return map;
+  }
 
-        self.post_journal_entry(JournalEntry(
-            entry_id=entry_id,
-            entry_date=d,
-            description=f"طلب توصيل أدوية رقم {order_ref}",
-            reference=order_ref,
-            lines=[
-                JournalLine(collection_acc, debit=customer_total, memo="تحصيل/ذمة إجمالي الطلب من العميل"),
-                JournalLine("2101", credit=pharmacy_payable, memo="مستحق الصيدلية بعد خصم العمولة"),
-                JournalLine("4101", credit=platform_commission, memo="إيراد عمولة المنصة"),
-                JournalLine("4102", credit=delivery_fee, memo="إيراد رسوم التوصيل"),
-            ]
-        ))
+  function fmt(num) {
+    return Number(num || 0).toFixed(2);
+  }
 
-    def settle_pharmacy_payout(self, entry_id: str, d: date, pharmacy_ref: str, amount: float) -> None:
-        """3) سداد مستحقات الصيدلية الشريكة من الحساب البنكي."""
-        self.post_journal_entry(JournalEntry(
-            entry_id=entry_id,
-            entry_date=d,
-            description=f"تسوية مستحقات صيدلية ({pharmacy_ref})",
-            reference=pharmacy_ref,
-            lines=[
-                JournalLine("2101", debit=amount, memo="تخفيض مستحقات الصيدلية"),
-                JournalLine("1102", credit=amount, memo="تحويل بنكي للصيدلية"),
-            ]
-        ))
+  // --- الأدوية والتوصيل ---
+  function renderMedicines() {
+    const q = document.getElementById("med-search").value.trim().toLowerCase();
+    const filter = document.getElementById("med-filter").value;
+    const tbody = document.getElementById("med-tbody");
 
-    def record_delivery_expense(self, entry_id: str, d: date, courier_ref: str, amount: float, from_cash: bool = True) -> None:
-        """4) تسجيل مصروف التوصيل / مستحقات مناديب التوصيل."""
-        pay_acc = "1101" if from_cash else "1102"
-        self.post_journal_entry(JournalEntry(
-            entry_id=entry_id,
-            entry_date=d,
-            description=f"مصروف توصيل طلبات ({courier_ref})",
-            reference=courier_ref,
-            lines=[
-                JournalLine("5201", debit=amount, memo="تكلفة/مصاريف التوصيل"),
-                JournalLine(pay_acc, credit=amount, memo="سداد مصروف التوصيل"),
-            ]
-        ))
+    const list = state.medicines.filter(m => {
+      const matchesText = !q ||
+        m.name.toLowerCase().includes(q) ||
+        m.active.toLowerCase().includes(q) ||
+        m.id.toLowerCase().includes(q);
+      const matchesFilter =
+        filter === "all" ||
+        (filter === "available" && m.qty > 0) ||
+        (filter === "low" && m.qty < 15);
+      return matchesText && matchesFilter;
+    });
 
-    def record_operating_expense(
-        self,
-        entry_id: str,
-        d: date,
-        expense_acc_code: str,
-        amount: float,
-        description: str,
-        reference: str,
-        from_bank: bool = True,
-    ) -> None:
-        """5) تسجيل مصروف تشغيلي (رواتب، بوابة دفع، تغليف طبي، تسويق)."""
-        pay_acc = "1102" if from_bank else "1101"
-        self.post_journal_entry(JournalEntry(
-            entry_id=entry_id,
-            entry_date=d,
-            description=description,
-            reference=reference,
-            lines=[
-                JournalLine(expense_acc_code, debit=amount, memo=description),
-                JournalLine(pay_acc, credit=amount, memo="سداد المصروف التشغيلي"),
-            ]
-        ))
+    tbody.innerHTML = list.map(m => `
+      <tr>
+        <td>
+          <strong>${m.name}</strong><br />
+          <span class="muted">${m.id} | دُفعة ${m.batch} | صلاحية ${m.exp}</span>
+        </td>
+        <td>${fmt(m.price)}</td>
+        <td><strong>${m.qty}</strong></td>
+        <td>
+          <button class="btn btn-sm" ${m.qty <= 0 ? "disabled" : ""} onclick="addToCart('${m.id}')">+ إضافة</button>
+        </td>
+      </tr>
+    `).join("") || `<tr><td colspan="4" class="muted">لا توجد نتائج مطابقة.</td></tr>`;
+  }
 
-    # ------------------------------------------------------------------
-    # القوائم المالية (Financial Statements)
-    # ------------------------------------------------------------------
+  function addToCart(medId) {
+    const med = state.medicines.find(m => m.id === medId);
+    if (!med || med.qty <= 0) return;
+    const existing = state.cart.find(c => c.id === medId);
+    if (existing) {
+      if (existing.qty + 1 > med.qty) return alert("الكمية المطلوبة تتجاوز المخزون المتاح.");
+      existing.qty += 1;
+    } else {
+      state.cart.push({ id: med.id, name: med.name, price: med.price, cost: med.cost, qty: 1 });
+    }
+    saveState();
+    renderCart();
+  }
 
-    def trial_balance(self) -> List[dict]:
-        """ميزان المراجعة (Trial Balance)."""
-        rows = []
-        for code, acc in sorted(self.accounts.items()):
-            # نستبعد الحسابات التجميعية الرئيسية التي ليس لها قيود مباشرة إذا أردنا، أو نعرض الكل
-            debit_sum, credit_sum = self.get_account_movement(code)
-            bal = self.get_account_balance(code)
-            if debit_sum > 0 or credit_sum > 0:
-                rows.append({
-                    "code": code,
-                    "name": acc.name,
-                    "type": acc.account_type.value,
-                    "debit": debit_sum,
-                    "credit": credit_sum,
-                    "balance": bal,
-                    "normal_side": acc.normal_side.value,
-                })
-        return rows
+  function removeFromCart(medId) {
+    state.cart = state.cart.filter(c => c.id !== medId);
+    saveState();
+    renderCart();
+  }
 
-    def income_statement(self) -> dict:
-        """قائمة الدخل / الأرباح والخسائر (Income Statement)."""
-        revenues = {}
-        expenses = {}
-        for code, acc in sorted(self.accounts.items()):
-            bal = self.get_account_balance(code)
-            if acc.account_type == AccountType.REVENUE and bal != 0:
-                revenues[acc.name] = bal
-            elif acc.account_type == AccountType.EXPENSE and bal != 0:
-                expenses[acc.name] = bal
+  function renderCart() {
+    const container = document.getElementById("cart-list");
+    const fee = Number(document.getElementById("delivery-fee").value || 0);
+    let itemsTotal = 0;
 
-        total_rev = round(sum(revenues.values()), 2)
-        total_exp = round(sum(expenses.values()), 2)
-        net_income = round(total_rev - total_exp, 2)
-        return {
-            "revenues": revenues,
-            "total_revenue": total_rev,
-            "expenses": expenses,
-            "total_expense": total_exp,
-            "net_income": net_income,
-        }
+    if (!state.cart.length) {
+      container.innerHTML = `<div class="muted">اختر أدوية من جدول البحث لإضافتها لطلب التوصيل.</div>`;
+    } else {
+      container.innerHTML = state.cart.map(c => {
+        const lineTotal = c.qty * c.price;
+        itemsTotal += lineTotal;
+        return `
+          <div class="cart-item">
+            <div>
+              <strong>${c.name}</strong><br />
+              <span class="muted">${c.qty} × ${fmt(c.price)} = ${fmt(lineTotal)}</span>
+            </div>
+            <button class="btn-danger" onclick="removeFromCart('${c.id}')">حذف</button>
+          </div>
+        `;
+      }).join("");
+    }
 
-    def balance_sheet(self) -> dict:
-        """الميزانية العمومية / قائمة المركز المالي (Balance Sheet)."""
-        assets = {}
-        liabilities = {}
-        equity = {}
+    document.getElementById("cart-total").textContent = fmt(itemsTotal + (state.cart.length ? fee : 0));
+  }
 
-        for code, acc in sorted(self.accounts.items()):
-            bal = self.get_account_balance(code)
-            if acc.account_type == AccountType.ASSET and bal != 0:
-                assets[acc.name] = bal
-            elif acc.account_type == AccountType.LIABILITY and bal != 0:
-                liabilities[acc.name] = bal
-            elif acc.account_type == AccountType.EQUITY and bal != 0:
-                equity[acc.name] = bal
+  function submitOrder() {
+    if (!state.cart.length) return alert("السلة فارغة! أضف دواءً واحداً على الأقل.");
+    const custName = document.getElementById("cust-name").value.trim();
+    const custPhone = document.getElementById("cust-phone").value.trim();
+    const custAddress = document.getElementById("cust-address").value.trim();
+    const fee = Number(document.getElementById("delivery-fee").value || 0);
+    const payMethod = document.getElementById("payment-method").value;
 
-        # ترحيل صافي الربح/الخسارة إلى حقوق الملكية لإغلاق الميزانية
-        net_income = self.income_statement()["net_income"]
-        equity["صافي ربح (خسارة) الفترة الحالية"] = net_income
+    if (!custName || !custAddress) return alert("يرجى إدخال اسم الزبون وعنوان التوصيل.");
 
-        total_assets = round(sum(assets.values()), 2)
-        total_liabilities = round(sum(liabilities.values()), 2)
-        total_equity = round(sum(equity.values()), 2)
+    let medRevenue = 0;
+    let totalCost = 0;
 
-        return {
-            "assets": assets,
-            "total_assets": total_assets,
-            "liabilities": liabilities,
-            "total_liabilities": total_liabilities,
-            "equity": equity,
-            "total_equity": total_equity,
-            "liabilities_plus_equity": round(total_liabilities + total_equity, 2),
-        }
+    for (const item of state.cart) {
+      const med = state.medicines.find(m => m.id === item.id);
+      if (!med || med.qty < item.qty) return alert(`مخزون ${item.name} غير كافٍ.`);
+      med.qty -= item.qty;
+      medRevenue += item.qty * item.price;
+      totalCost += item.qty * item.cost;
+    }
 
+    const grandTotal = medRevenue + fee;
+    const orderId = "ORD-" + (1000 + state.orders.length + 1);
+    const jeId = "JE-" + (1000 + state.journal.length + 1);
+    const today = new Date().toISOString().slice(0, 10);
 
-# ----------------------------------------------------------------------
-# مثال تشغيل تجريبي (Demo Execution)
-# ----------------------------------------------------------------------
-if __name__ == "__main__":
-    erp = PharmacyDeliveryERP()
-    today = date(2026, 11, 25)
+    const debitAcc = payMethod === "cash" ? "1111" : "1121";
+    const lines = [
+      { acc: debitAcc, debit: grandTotal, credit: 0 },
+      { acc: "4111", debit: 0, credit: medRevenue }
+    ];
+    if (fee > 0) lines.push({ acc: "4121", debit: 0, credit: fee });
+    lines.push({ acc: "5111", debit: totalCost, credit: 0 });
+    lines.push({ acc: "1131", debit: 0, credit: totalCost });
 
-    # 1. رأس المال
-    erp.capital_injection("JE-001", today, amount=50000.0, to_bank=True)
+    state.journal.unshift({
+      id: jeId,
+      date: today,
+      ref: orderId,
+      desc: `بيع وتوصيل أدوية للزبون: ${custName}`,
+      lines
+    });
 
-    # 2. طلب دواء بقيمة 200 ورسوم توصيل 25 وعمولة منصة 15% (30) -> مستحق الصيدلية 170
-    erp.record_marketplace_order(
-        entry_id="JE-002",
-        d=today,
-        order_ref="ORD-1001",
-        medicine_amount=200.0,
-        delivery_fee=25.0,
-        commission_rate=0.15,
-        paid_online=True,
-    )
+    state.orders.unshift({
+      id: orderId,
+      date: today,
+      custName,
+      custPhone,
+      custAddress,
+      itemsSummary: state.cart.map(i => `${i.name} (${i.qty})`).join("، "),
+      total: grandTotal,
+      status: "pending",
+      jeId
+    });
 
-    # 3. طلب آخر بقيمة 100 ورسوم توصيل 15 وعمولة منصة 15% (15) -> مستحق الصيدلية 85
-    erp.record_marketplace_order(
-        entry_id="JE-003",
-        d=today,
-        order_ref="ORD-1002",
-        medicine_amount=100.0,
-        delivery_fee=15.0,
-        commission_rate=0.15,
-        paid_online=True,
-    )
+    state.cart = [];
+    document.getElementById("cust-name").value = "";
+    document.getElementById("cust-phone").value = "";
+    document.getElementById("cust-address").value = "";
 
-    # 4. سداد جزء من مستحقات الصيدلية (150 من أصل 255)
-    erp.settle_pharmacy_payout("JE-004", today, pharmacy_ref="PH-01", amount=150.0)
+    saveState();
+    renderAll();
+    alert(`تم إنشاء الطلب ${orderId} وترحيل القيد ${jeId} بنجاح.`);
+  }
 
-    # 5. مصاريف التوصيل والرواتب
-    erp.record_delivery_expense("JE-005", today, courier_ref="DLV-01", amount=20.0, from_cash=False)
-    erp.record_operating_expense("JE-006", today, "5203", amount=1200.0, "رواتب دعم فني وتشغيل", "SAL-11")
+  function updateOrderStatus(orderId, status) {
+    const ord = state.orders.find(o => o.id === orderId);
+    if (!ord) return;
+    ord.status = status;
+    saveState();
+    renderOrders();
+    renderKPIs();
+  }
 
-    print("=== ميزان المراجعة (Trial Balance) ===")
-    for r in erp.trial_balance():
-        print(f"{r['code']} | {r['name']} | مدين: {r['debit']} | دائن: {r['credit']} | رصيد ({r['normal_side']}): {r['balance']}")
+  function renderOrders() {
+    const tbody = document.getElementById("orders-tbody");
+    const statusMap = {
+      pending: `<span class="badge b-pending">قيد التجهيز</span>`,
+      transit: `<span class="badge b-transit">جاري التوصيل</span>`,
+      delivered: `<span class="badge b-delivered">تم التسليم</span>`
+    };
 
-    inc = erp.income_statement()
-    print("\n=== قائمة الدخل (Income Statement) ===")
-    print("الإيرادات:", inc["revenues"], "-> الإجمالي:", inc["total_revenue"])
-    print("المصروفات:", inc["expenses"], "-> الإجمالي:", inc["total_expense"])
-    print("صافي الربح/الخسارة:", inc["net_income"])
+    tbody.innerHTML = state.orders.map(o => `
+      <tr>
+        <td><strong>${o.id}</strong><br /><span class="muted">${o.date}</span></td>
+        <td><strong>${o.custName}</strong><br /><span class="muted">${o.custAddress}</span></td>
+        <td>${o.itemsSummary}</td>
+        <td><strong>${fmt(o.total)}</strong></td>
+        <td>${statusMap[o.status] || o.status}</td>
+        <td>
+          <select onchange="updateOrderStatus('${o.id}', this.value)">
+            <option value="pending" ${o.status === "pending" ? "selected" : ""}>قيد التجهيز</option>
+            <option value="transit" ${o.status === "transit" ? "selected" : ""}>جاري التوصيل</option>
+            <option value="delivered" ${o.status === "delivered" ? "selected" : ""}>تم التسليم</option>
+          </select>
+        </td>
+      </tr>
+    `).join("") || `<tr><td colspan="6" class="muted">لا توجد طلبات توصيل بعد.</td></tr>`;
+  }
 
-    bs = erp.balance_sheet()
-    print("\n=== الميزانية العمومية (Balance Sheet) ===")
-    print("الأصول:", bs["assets"], "-> الإجمالي:", bs["total_assets"])
-    print("الخصوم:", bs["liabilities"], "-> الإجمالي:", bs["total_liabilities"])
-    print("حقوق الملكية:", bs["equity"], "-> الإجمالي:", bs["total_equity"])
-    print("التحقق (الخصوم + حقوق الملكية):", bs["liabilities_plus_equity"])
+  // --- دليل الحسابات والقيود والقوائم ---
+  function addAccount() {
+    const code = document.getElementById("new-acc-code").value.trim();
+    const name = document.getElementById("new-acc-name").value.trim();
+    const type = document.getElementById("new-acc-type").value;
+    if (!code || !name) return alert("يرجى إدخال رمز الحساب واسمه.");
+    if (state.accounts.some(a => a.code === code)) return alert("رمز الحساب مستخدم مسبقاً.");
+
+    const normal = (type === "Asset" || type === "Expense") ? "Debit" : "Credit";
+    state.accounts.push({ code, name, type, normal });
+    state.accounts.sort((a, b) => a.code.localeCompare(b.code));
+    document.getElementById("new-acc-code").value = "";
+    document.getElementById("new-acc-name").value = "";
+    saveState();
+    renderAll();
+  }
+
+  function renderCOA() {
+    const bals = getAccountBalances();
+    const typeAr = { Asset: "أصول", Liability: "التزامات", Equity: "حقوق ملكية", Revenue: "إيرادات", Expense: "مصروفات" };
+    document.getElementById("coa-tbody").innerHTML = state.accounts.map(a => {
+      const b = bals[a.code];
+      return `
+        <tr>
+          <td><strong>${a.code}</strong></td>
+          <td>${a.name}</td>
+          <td>${typeAr[a.type]}</td>
+          <td>${a.normal === "Debit" ? "مدين" : "دائن"}</td>
+          <td><strong>${fmt(b ? b.balance : 0)}</strong></td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  function renderJournalAndTB() {
+    const bals = getAccountBalances();
+    const accName = code => {
+      const a = state.accounts.find(x => x.code === code);
+      return a ? `${a.code} - ${a.name}` : code;
+    };
+
+    document.getElementById("journal-list").innerHTML = state.journal.map(je => `
+      <div style="border:1px solid var(--border); border-radius:10px; padding:10px; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; font-size:0.82rem; margin-bottom:6px;">
+          <strong>${je.id} (${je.ref})</strong>
+          <span class="muted">${je.date}</span>
+        </div>
+        <div class="muted" style="margin-bottom:6px;">${je.desc}</div>
+        <table>
+          <thead><tr><th>الحساب</th><th>مدين</th><th>دائن</th></tr></thead>
+          <tbody>
+            ${je.lines.map(l => `
+              <tr>
+                <td>${accName(l.acc)}</td>
+                <td>${l.debit ? fmt(l.debit) : "-"}</td>
+                <td>${l.credit ? fmt(l.credit) : "-"}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    `).join("");
+
+    let sumDr = 0, sumCr = 0;
+    const rows = state.accounts.map(a => {
+      const b = bals[a.code];
+      const dr = b.balance > 0 && a.normal === "Debit" ? b.balance : (b.balance < 0 && a.normal === "Credit" ? Math.abs(b.balance) : 0);
+      const cr = b.balance > 0 && a.normal === "Credit" ? b.balance : (b.balance < 0 && a.normal === "Debit" ? Math.abs(b.balance) : 0);
+      sumDr += dr;
+      sumCr += cr;
+      return `<tr><td>${a.code} - ${a.name}</td><td>${fmt(dr)}</td><td>${fmt(cr)}</td></tr>`;
+    }).join("");
+
+    document.getElementById("tb-tbody").innerHTML = rows + `
+      <tr style="font-weight:700; background:#f1f5f9;">
+        <td>الإجمالي</td>
+        <td>${fmt(sumDr)}</td>
+        <td>${fmt(sumCr)}</td>
+      </tr>
+    `;
+  }
+
+  function renderStatements() {
+    const bals = getAccountBalances();
+    const sumByType = type => Object.values(bals)
+      .filter(a => a.type === type)
+      .reduce((acc, a) => acc + a.balance, 0);
+
+    const revenue = sumByType("Revenue");
+    const expenses = sumByType("Expense");
+    const netProfit = revenue - expenses;
+
+    document.getElementById("is-tbody").innerHTML = `
+      <tr><td>إجمالي الإيرادات (مبيعات وتوصيل)</td><td><strong>${fmt(revenue)}</strong></td></tr>
+      <tr><td>إجمالي المصروفات وتكلفة البضاعة المباعة</td><td><strong>${fmt(expenses)}</strong></td></tr>
+      <tr style="background:#f0fdf4; font-weight:800;">
+        <td>صافي الربح (أو الخسارة)</td>
+        <td>${fmt(netProfit)}</td>
+      </tr>
+    `;
+
+    const assets = sumByType("Asset");
+    const liabilities = sumByType("Liability");
+    const equity = sumByType("Equity") + netProfit;
+    const rightSide = liabilities + equity;
+    const diff = Math.abs(assets - rightSide);
+
+    document.getElementById("bs-tbody").innerHTML = `
+      <tr><td>إجمالي الأصول</td><td><strong>${fmt(assets)}</strong></td></tr>
+      <tr><td>إجمالي الالتزامات</td><td><strong>${fmt(liabilities)}</strong></td></tr>
+      <tr><td>إجمالي حقوق الملكية (شاملاً صافي الربح)</td><td><strong>${fmt(equity)}</strong></td></tr>
+      <tr style="background:#f8fafc; font-weight:700;">
+        <td>الالتزامات + حقوق الملكية</td>
+        <td>${fmt(rightSide)}</td>
+      </tr>
+    `;
+
+    const checkEl = document.getElementById("bs-check");
+    checkEl.className = diff < 0.01 ? "balanced" : "unbalanced";
+    checkEl.textContent = diff < 0.01
+      ? "✓ الميزانية متوازنة: الأصول تساوي الالتزامات وحقوق الملكية."
+      : `⚠ يوجد فرق توازن قدره ${fmt(diff)}.`;
+  }
+
+  function renderKPIs() {
+    const stockCost = state.medicines.reduce((s, m) => s + (m.qty * m.cost), 0);
+    const bals = getAccountBalances();
+    const sales = Object.values(bals).filter(a => a.type === "Revenue").reduce((s, a) => s + a.balance, 0);
+    const exp = Object.values(bals).filter(a => a.type === "Expense").reduce((s, a) => s + a.balance, 0);
+    const activeDel = state.orders.filter(o => o.status !== "delivered").length;
+
+    document.getElementById("kpi-stock-cost").textContent = fmt(stockCost);
+    document.getElementById("kpi-sales").textContent = fmt(sales);
+    document.getElementById("kpi-active-deliveries").textContent = activeDel;
+    document.getElementById("kpi-net-profit").textContent = fmt(sales - exp);
+  }
+
+  function renderAll() {
+    renderKPIs();
+    renderMedicines();
+    renderCart();
+    renderOrders();
+    renderCOA();
+    renderJournalAndTB();
+    renderStatements();
+  }
+
+  renderAll();
+</script>
+</body>
+</html>
