@@ -1,369 +1,224 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>منظومة محاسبية - منصة توصيل الأدوية</title>
-  <style>
-    :root {
-      --bg: #0f172a;
-      --card: #1e293b;
-      --card-2: #0b1220;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --primary: #10b981;
-      --primary-hover: #059669;
-      --danger: #ef4444;
-      --border: #334155;
-    }
+from __future__ import annotations
 
-    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+from dataclasses import dataclass, field
+from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
+from enum import Enum
+from typing import Dict, List
 
-    body {
-      margin: 0;
-      padding: 16px;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
-    }
 
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-    }
+def money(value: float | int | str | Decimal) -> Decimal:
+    return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-    h1 {
-      font-size: 1.35rem;
-      margin: 0 0 6px;
-    }
 
-    .subtitle {
-      color: var(--muted);
-      font-size: 0.9rem;
-      margin-bottom: 18px;
-    }
+class AccountType(str, Enum):
+    ASSET = "أصول"
+    LIABILITY = "خصوم"
+    REVENUE = "إيرادات"
+    EXPENSE = "مصروفات"
 
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
-      gap: 12px;
-      margin-bottom: 18px;
-    }
 
-    .stat-box {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px;
-    }
+@dataclass
+class Account:
+    code: str
+    name: str
+    account_type: AccountType
+    balance: Decimal = Decimal("0.00")
 
-    .stat-label {
-      font-size: 0.82rem;
-      color: var(--muted);
-    }
+    def apply(self, debit: Decimal, credit: Decimal) -> None:
+        # في الأصول والمصروفات: المدين يزيد والائتمان ينقص
+        # في الخصوم والإيرادات: الائتمان يزيد والمدين ينقص
+        if self.account_type in (AccountType.ASSET, AccountType.EXPENSE):
+            self.balance += (debit - credit)
+        else:
+            self.balance += (credit - debit)
 
-    .stat-value {
-      font-size: 1.25rem;
-      font-weight: 700;
-      margin-top: 4px;
-      color: var(--primary);
-    }
 
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 18px;
-    }
+@dataclass
+class JournalLine:
+    account_code: str
+    debit: Decimal = Decimal("0.00")
+    credit: Decimal = Decimal("0.00")
+    party_id: str | None = None  # مثل معرف الصيدلية أو المندوب
 
-    .grid-form {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px;
-    }
 
-    label {
-      display: block;
-      font-size: 0.85rem;
-      margin-bottom: 4px;
-      color: #cbd5e1;
-    }
+@dataclass
+class JournalEntry:
+    entry_id: str
+    entry_date: date
+    description: str
+    lines: List[JournalLine] = field(default_factory=list)
 
-    input, select {
-      width: 100%;
-      padding: 10px 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--card-2);
-      color: var(--text);
-      font-size: 0.95rem;
-    }
+    def is_balanced(self) -> bool:
+        total_debit = sum((line.debit for line in self.lines), Decimal("0.00"))
+        total_credit = sum((line.credit for line in self.lines), Decimal("0.00"))
+        return total_debit == total_credit
 
-    .actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 14px;
-      flex-wrap: wrap;
-    }
 
-    button {
-      padding: 10px 16px;
-      border: none;
-      border-radius: 8px;
-      font-size: 0.92rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
+class PharmacyPlatformERP:
+    """محرك محاسبي مبسط بنمط ERP لمنصة وسيطة للأدوية والتوصيل."""
 
-    .btn-primary {
-      background: var(--primary);
-      color: #06281e;
-    }
+    def __init__(self) -> None:
+        self.accounts: Dict[str, Account] = {}
+        self.entries: List[JournalEntry] = []
+        self.pharmacy_payables: Dict[str, Decimal] = {}
+        self._setup_chart_of_accounts()
 
-    .btn-primary:hover { background: var(--primary-hover); }
+    def _setup_chart_of_accounts(self) -> None:
+        default_accounts = [
+            Account("1010", "البنك / بوابة الدفع", AccountType.ASSET),
+            Account("1020", "عهدة مناديب التوصيل (نقد عند الاستلام)", AccountType.ASSET),
+            Account("2010", "مستحقات الصيدليات (تسوية)", AccountType.LIABILITY),
+            Account("2020", "ضريبة القيمة المضافة المستحقة", AccountType.LIABILITY),
+            Account("4010", "إيراد عمولات المنصة من الصيدليات", AccountType.REVENUE),
+            Account("4020", "إيراد رسوم التوصيل", AccountType.REVENUE),
+            Account("5010", "مصروف أجور/تكلفة التوصيل", AccountType.EXPENSE),
+        ]
+        for acc in default_accounts:
+            self.accounts[acc.code] = acc
 
-    .btn-danger {
-      background: rgba(239, 68, 68, 0.15);
-      color: #fca5a5;
-      border: 1px solid rgba(239, 68, 68, 0.35);
-    }
+    def post_entry(self, entry: JournalEntry) -> None:
+        if not entry.is_balanced():
+            raise ValueError(f"القيد {entry.entry_id} غير متوازن: المدين لا يساوي الدائن.")
 
-    .btn-sm {
-      padding: 6px 10px;
-      font-size: 0.8rem;
-    }
+        for line in entry.lines:
+            if line.account_code not in self.accounts:
+                raise KeyError(f"الحساب {line.account_code} غير موجود في شجرة الحسابات.")
+            debit = money(line.debit)
+            credit = money(line.credit)
+            self.accounts[line.account_code].apply(debit, credit)
 
-    .table-wrap {
-      overflow-x: auto;
-    }
+            # تتبع رصيد كل صيدلية على حدة ضمن حساب 2010
+            if line.account_code == "2010" and line.party_id:
+                current = self.pharmacy_payables.get(line.party_id, Decimal("0.00"))
+                self.pharmacy_payables[line.party_id] = current + (credit - debit)
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 720px;
-    }
+        self.entries.append(entry)
 
-    th, td {
-      padding: 10px;
-      border-bottom: 1px solid var(--border);
-      text-align: right;
-      font-size: 0.88rem;
-    }
+    def record_order_settlement(
+        self,
+        order_id: str,
+        tx_date: date,
+        pharmacy_id: str,
+        medicine_subtotal: float,
+        delivery_fee: float,
+        commission_rate: float = 0.15,
+        courier_payout: float = 0.0,
+        payment_method: str = "ONLINE",  # "ONLINE" أو "COD"
+        vat_rate: float = 0.0,
+    ) -> None:
+        """
+        تسجيل محاسبي لطلب دواء مكتمل التوصيل:
+        - إجمالي ما يدفعه العميل = قيمة الأدوية + الضريبة + رسوم التوصيل
+        - عمولة المنصة = نسبة من قيمة الأدوية
+        - مستحق الصيدلية = قيمة الأدوية - عمولة المنصة
+        """
+        med_amount = money(medicine_subtotal)
+        deliv_fee = money(delivery_fee)
+        vat_amount = money(med_amount * Decimal(str(vat_rate)))
+        commission = money(med_amount * Decimal(str(commission_rate)))
+        pharmacy_due = money(med_amount - commission)
+        courier_cost = money(courier_payout)
 
-    th {
-      color: var(--muted);
-      font-weight: 600;
-      background: var(--card-2);
-    }
+        total_collected = money(med_amount + vat_amount + deliv_fee)
+        collection_account = "1010" if payment_method.upper() == "ONLINE" else "1020"
 
-    .empty {
-      text-align: center;
-      color: var(--muted);
-      padding: 24px;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>💊 المنظومة المحاسبية لتوصيل الأدوية</h1>
-    <div class="subtitle">متابعة مستحقات الصيدليات، أجور التوصيل، عمولة المنصة، وإجمالي تحصيل العملاء</div>
+        lines: List[JournalLine] = [
+            # 1. تحصيل المبلغ من العميل
+            JournalLine(account_code=collection_account, debit=total_collected),
+            # 2. إثبات مستحق الصيدلية (بعد خصم عمولة المنصة)
+            JournalLine(
+                account_code="2010",
+                credit=pharmacy_due,
+                party_id=pharmacy_id,
+            ),
+            # 3. إثبات عمولة المنصة
+            JournalLine(account_code="4010", credit=commission),
+        ]
 
-    <!-- الملخص المحاسبي -->
-    <div class="stats">
-      <div class="stat-box">
-        <div class="stat-label">إجمالي المحصّل من العملاء</div>
-        <div class="stat-value" id="totalCollected">0.00</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-label">مستحقات الصيدليات (الأدوية)</div>
-        <div class="stat-value" id="totalPharmacy">0.00</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-label">إجمالي أجور التوصيل</div>
-        <div class="stat-value" id="totalDelivery">0.00</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-label">صافي ربح / عمولة المنصة</div>
-        <div class="stat-value" id="totalPlatformProfit">0.00</div>
-      </div>
-    </div>
+        if vat_amount > Decimal("0.00"):
+            lines.append(JournalLine(account_code="2020", credit=vat_amount))
 
-    <!-- إضافة طلب جديد -->
-    <div class="card">
-      <h2 style="margin: 0 0 12px; font-size: 1.05rem;">تسجيل طلب جديد</h2>
-      <form id="orderForm">
-        <div class="grid-form">
-          <div>
-            <label for="customerName">اسم العميل</label>
-            <input type="text" id="customerName" placeholder="مثال: أحمد سالم" required />
-          </div>
-          <div>
-            <label for="pharmacyName">اسم الصيدلية</label>
-            <input type="text" id="pharmacyName" placeholder="مثال: صيدلية الشفاء" required />
-          </div>
-          <div>
-            <label for="medicinePrice">قيمة الدواء (للصيدلية)</label>
-            <input type="number" id="medicinePrice" step="0.01" min="0" placeholder="0.00" required />
-          </div>
-          <div>
-            <label for="deliveryFee">أجرة التوصيل</label>
-            <input type="number" id="deliveryFee" step="0.01" min="0" placeholder="0.00" required />
-          </div>
-          <div>
-            <label for="commissionRate">نسبة عمولة المنصة (%)</label>
-            <input type="number" id="commissionRate" step="0.1" min="0" max="100" value="10" required />
-          </div>
-          <div>
-            <label for="paymentStatus">حالة الدفع</label>
-            <select id="paymentStatus">
-              <option value="مدفوع">مدفوع</option>
-              <option value="عند الاستلام">عند الاستلام</option>
-            </select>
-          </div>
-        </div>
+        if deliv_fee > Decimal("0.00"):
+            lines.append(JournalLine(account_code="4020", credit=deliv_fee))
 
-        <div class="actions">
-          <button type="submit" class="btn-primary">+ حفظ العملية</button>
-          <button type="button" class="btn-danger" id="clearAllBtn">مسح جميع السجلات</button>
-        </div>
-      </form>
-    </div>
+        if courier_cost > Decimal("0.00"):
+            # قيد تكلفة التوصيل مقابل رصيد المندوب أو البنك
+            lines.append(JournalLine(account_code="5010", debit=courier_cost))
+            lines.append(JournalLine(account_code="1020", credit=courier_cost))
 
-    <!-- سجل القيود والطلبات -->
-    <div class="card">
-      <h2 style="margin: 0 0 12px; font-size: 1.05rem;">سجل الطلبات والحسابات</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>العميل</th>
-              <th>الصيدلية</th>
-              <th>الدواء</th>
-              <th>التوصيل</th>
-              <th>عمولة المنصة</th>
-              <th>إجمالي العميل</th>
-              <th>الحالة</th>
-              <th>إجراء</th>
-            </tr>
-          </thead>
-          <tbody id="ordersBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+        entry = JournalEntry(
+            entry_id=f"JE-ORD-{order_id}",
+            entry_date=tx_date,
+            description=f"تسوية طلب دواء #{order_id} - صيدلية {pharmacy_id}",
+            lines=lines,
+        )
+        self.post_entry(entry)
 
-  <script>
-    const STORAGE_KEY = "pharmacy_intermediary_orders_v1";
-    let orders = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    def settle_pharmacy_balance(
+        self,
+        settlement_id: str,
+        tx_date: date,
+        pharmacy_id: str,
+        amount: float,
+    ) -> None:
+        """صرف وتحويل مستحقات الصيدلية من حساب البنك."""
+        pay_amount = money(amount)
+        current_due = self.pharmacy_payables.get(pharmacy_id, Decimal("0.00"))
+        if pay_amount <= Decimal("0.00") or pay_amount > current_due:
+            raise ValueError(
+                f"مبلغ التسوية ({pay_amount}) غير صالح؛ المستحق الحالي للصيدلية {pharmacy_id} هو {current_due}."
+            )
 
-    const form = document.getElementById("orderForm");
-    const ordersBody = document.getElementById("ordersBody");
-    const clearAllBtn = document.getElementById("clearAllBtn");
+        entry = JournalEntry(
+            entry_id=f"JE-STL-{settlement_id}",
+            entry_date=tx_date,
+            description=f"تحويل مستحقات صيدلية {pharmacy_id}",
+            lines=[
+                JournalLine(account_code="2010", debit=pay_amount, party_id=pharmacy_id),
+                JournalLine(account_code="1010", credit=pay_amount),
+            ],
+        )
+        self.post_entry(entry)
 
-    function formatMoney(num) {
-      return Number(num || 0).toFixed(2);
-    }
+    def trial_balance(self) -> List[Dict[str, str]]:
+        report = []
+        for code, acc in self.accounts.items():
+            report.append(
+                {
+                    "code": code,
+                    "name": acc.name,
+                    "type": acc.account_type.value,
+                    "balance": f"{acc.balance:.2f}",
+                }
+            )
+        return report
 
-    function saveOrders() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
-    }
 
-    function render() {
-      let totalCollected = 0;
-      let totalPharmacy = 0;
-      let totalDelivery = 0;
-      let totalPlatformProfit = 0;
+if __name__ == "__main__":
+    erp = PharmacyPlatformERP()
 
-      if (orders.length === 0) {
-        ordersBody.innerHTML = `<tr><td colspan="9" class="empty">لا توجد عمليات مسجلة بعد. أضف أول طلب بالأعلى.</td></tr>`;
-      } else {
-        ordersBody.innerHTML = orders.map((o, idx) => {
-          totalCollected += o.customerTotal;
-          totalPharmacy += o.medicinePrice;
-          totalDelivery += o.deliveryFee;
-          totalPlatformProfit += o.platformCommission;
+    # مثال 1: طلب دواء بقيمة 200، توصيل 20، عمولة 15%، دفع إلكتروني
+    erp.record_order_settlement(
+        order_id="1001",
+        tx_date=date(2026, 11, 25),
+        pharmacy_id="PH-01",
+        medicine_subtotal=200.00,
+        delivery_fee=20.00,
+        commission_rate=0.15,
+        courier_payout=15.00,
+        payment_method="ONLINE",
+    )
 
-          return `
-            <tr>
-              <td>${idx + 1}</td>
-              <td>${escapeHtml(o.customerName)}</td>
-              <td>${escapeHtml(o.pharmacyName)}</td>
-              <td>${formatMoney(o.medicinePrice)}</td>
-              <td>${formatMoney(o.deliveryFee)}</td>
-              <td>${formatMoney(o.platformCommission)}</td>
-              <td><strong>${formatMoney(o.customerTotal)}</strong></td>
-              <td>${escapeHtml(o.paymentStatus)}</td>
-              <td>
-                <button class="btn-danger btn-sm" onclick="deleteOrder(${o.id})">حذف</button>
-              </td>
-            </tr>
-          `;
-        }).join("");
-      }
+    # مثال 2: سداد جزئي لمستحقات الصيدلية PH-01
+    erp.settle_pharmacy_balance(
+        settlement_id="S-01",
+        tx_date=date(2026, 11, 25),
+        pharmacy_id="PH-01",
+        amount=100.00,
+    )
 
-      document.getElementById("totalCollected").textContent = formatMoney(totalCollected);
-      document.getElementById("totalPharmacy").textContent = formatMoney(totalPharmacy);
-      document.getElementById("totalDelivery").textContent = formatMoney(totalDelivery);
-      document.getElementById("totalPlatformProfit").textContent = formatMoney(totalPlatformProfit);
-    }
-
-    function escapeHtml(str) {
-      return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-    }
-
-    window.deleteOrder = function(id) {
-      orders = orders.filter(item => item.id !== id);
-      saveOrders();
-      render();
-    };
-
-    form.addEventListener("submit", function(e) {
-      e.preventDefault();
-
-      const customerName = document.getElementById("customerName").value.trim();
-      const pharmacyName = document.getElementById("pharmacyName").value.trim();
-      const medicinePrice = parseFloat(document.getElementById("medicinePrice").value) || 0;
-      const deliveryFee = parseFloat(document.getElementById("deliveryFee").value) || 0;
-      const commissionRate = parseFloat(document.getElementById("commissionRate").value) || 0;
-      const paymentStatus = document.getElementById("paymentStatus").value;
-
-      // حساب العمولة وإجمالي المطلوب من العميل
-      const platformCommission = (medicinePrice * commissionRate) / 100;
-      const customerTotal = medicinePrice + deliveryFee + platformCommission;
-
-      orders.unshift({
-        id: Date.now(),
-        customerName,
-        pharmacyName,
-        medicinePrice,
-        deliveryFee,
-        platformCommission,
-        customerTotal,
-        paymentStatus
-      });
-
-      saveOrders();
-      render();
-      form.reset();
-      document.getElementById("commissionRate").value = commissionRate;
-    });
-
-    clearAllBtn.addEventListener("click", function() {
-      if (orders.length === 0) return;
-      if (confirm("هل أنت متأكد من مسح جميع السجلات المحاسبية؟")) {
-        orders = [];
-        saveOrders();
-        render();
-      }
-    });
-
-    render();
-  </script>
-</body>
-</html>
+    print("مستحق الصيدلية PH-01 المتبقي:", erp.pharmacy_payables.get("PH-01"))
+    print("ميزان المراجعة:")
+    for row in erp.trial_balance():
+        print(row)
