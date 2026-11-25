@@ -1,105 +1,361 @@
-import sqlite3
-
-ACCOUNTS_DATA = [
-    # (code, name, ledger, account_type, statement, parent_full_code, is_postable)
-    ("1", "الأصول", "الأستاذ العام", "مدين", "المركز المالي", None, False),
-    ("11", "الأصول غير المتداولة", "الأستاذ العام", "مدين", "المركز المالي", "1", False),
-    ("111", "الأصول الثابتة", "الأستاذ العام", "مدين", "المركز المالي", "11", False),
-    ("11101", "الآلات والمعدات", "الأستاذ العام", "مدين", "المركز المالي", "111", False),
-    ("01", "حواسيب", "الأستاذ المساعد", "مدين", "المركز المالي", "11101", False),
-    ("0001", "حواسيب مكتبية", "الأستاذ التحليلي", "مدين", "المركز المالي", "11101-01", True),
-    ("0002", "حواسيب محمولة", "الأستاذ التحليلي", "مدين", "المركز المالي", "11101-01", True),
-    ("02", "ماكينة عد الأموال", "الأستاذ المساعد", "مدين", "المركز المالي", "11101", True),
-    ("12", "الأصول المتداولة", "الأستاذ العام", "مدين", "المركز المالي", "1", False),
-    ("121", "النقدية وما في حكمها", "الأستاذ العام", "مدين", "المركز المالي", "12", False),
-    ("12101", "الخزينة الرئيسية", "الأستاذ العام", "مدين", "المركز المالي", "121", False),
-    ("01", "خزينة الدولار", "الأستاذ المساعد", "مدين", "المركز المالي", "12101", True),
-    ("02", "خزينة اليورو", "الأستاذ المساعد", "مدين", "المركز المالي", "12101", True),
-    ("4", "الإيرادات", "الأستاذ العام", "دائن", "الدخل", None, False),
-    ("41", "إيرادات التشغيل", "الأستاذ العام", "دائن", "الدخل", "4", False),
-    ("411", "إيرادات العمولات", "الأستاذ العام", "دائن", "الدخل", "41", False),
-    ("01", "عمولة صيدلية الرحيق", "الأستاذ المساعد", "دائن", "الدخل", "411", False),
-    ("0001", "الرحيق بلعون", "الأستاذ التحليلي", "دائن", "الدخل", "411-01", True),
-    ("0002", "الرحيق قاريونس", "الأستاذ التحليلي", "دائن", "الدخل", "411-01", True),
-]
+from __future__ import annotations
+from dataclasses import dataclass, field
+from datetime import date
+from enum import Enum
+from typing import Dict, List, Optional
 
 
-class ChartOfAccountsERP:
-    def __init__(self, db_path: str = ":memory:"):
-        self.conn = sqlite3.connect(db_path)
-        self.conn.row_factory = sqlite3.Row
-        self.conn.execute("PRAGMA foreign_keys = ON;")
-        self._create_schema()
+class AccountType(str, Enum):
+    ASSET = "أصول"            # Assets
+    LIABILITY = "خصوم"        # Liabilities
+    EQUITY = "حقوق ملكية"      # Equity
+    REVENUE = "إيرادات"        # Revenue
+    EXPENSE = "مصروفات"        # Expenses
 
-    def _create_schema(self):
-        with self.conn:
-            self.conn.execute("""
-                CREATE TABLE IF NOT EXISTS accounts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    code TEXT NOT NULL,
-                    full_code TEXT NOT NULL UNIQUE,
-                    name TEXT NOT NULL,
-                    ledger TEXT NOT NULL,
-                    account_type TEXT NOT NULL,
-                    statement TEXT NOT NULL,
-                    parent_full_code TEXT,
-                    is_postable INTEGER NOT NULL DEFAULT 0,
-                    FOREIGN KEY (parent_full_code) REFERENCES accounts(full_code)
-                );
-            """)
 
-    def add_account(self, item: tuple):
-        code, name, ledger, acc_type, stmt, parent, postable = item
-        full_code = f"{parent}-{code}" if parent else code
-        with self.conn:
-            self.conn.execute(
-                """
-                INSERT INTO accounts (
-                    code, full_code, name, ledger,
-                    account_type, statement, parent_full_code, is_postable
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    code.strip(),
-                    full_code.strip(),
-                    name.strip(),
-                    ledger.strip(),
-                    acc_type.strip(),
-                    stmt.strip(),
-                    parent,
-                    1 if postable else 0,
-                ),
+class NormalSide(str, Enum):
+    DEBIT = "مدين"
+    CREDIT = "دائن"
+
+
+@dataclass
+class Account:
+    code: str
+    name: str
+    account_type: AccountType
+    normal_side: NormalSide
+    parent_code: Optional[str] = None
+
+
+@dataclass
+class JournalLine:
+    account_code: str
+    debit: float = 0.0
+    credit: float = 0.0
+    memo: str = ""
+
+
+@dataclass
+class JournalEntry:
+    entry_id: str
+    entry_date: date
+    description: str
+    reference: str
+    lines: List[JournalLine] = field(default_factory=list)
+
+    def validate(self) -> None:
+        if not self.lines:
+            raise ValueError(f"القيد {self.entry_id} لا يحتوي على أي سطور.")
+        total_debit = round(sum(line.debit for line in self.lines), 2)
+        total_credit = round(sum(line.credit for line in self.lines), 2)
+        if total_debit <= 0 or total_credit <= 0:
+            raise ValueError(f"قيم القيد {self.entry_id} يجب أن تكون أكبر من الصفر.")
+        if total_debit != total_credit:
+            raise ValueError(
+                f"القيد {self.entry_id} غير متوازن! مدين={total_debit} بينما دائن={total_credit}"
             )
-        return full_code
-
-    def load_accounts(self, items: list[tuple]):
-        for item in items:
-            self.add_account(item)
-
-    def print_tree(self, parent_full_code: str | None = None, indent: int = 0):
-        if parent_full_code is None:
-            rows = self.conn.execute(
-                "SELECT * FROM accounts WHERE parent_full_code IS NULL ORDER BY full_code"
-            ).fetchall()
-        else:
-            rows = self.conn.execute(
-                "SELECT * FROM accounts WHERE parent_full_code = ? ORDER BY full_code",
-                (parent_full_code,),
-            ).fetchall()
-
-        for row in rows:
-            branch = "│   " * indent + ("├── " if indent > 0 else "")
-            flag = "[قابل للقيد]" if row["is_postable"] else "[تجميعي]"
-            print(f"{branch}{row['full_code']} | {row['name']} ({row['ledger']}) {flag}")
-            self.print_tree(row["full_code"], indent + 1)
-
-    def close(self):
-        self.conn.close()
 
 
+class PharmacyDeliveryERP:
+    def __init__(self) -> None:
+        self.accounts: Dict[str, Account] = {}
+        self.journal_entries: List[JournalEntry] = []
+        self._init_chart_of_accounts()
+
+    def _init_chart_of_accounts(self) -> None:
+        """دليل الحسابات (Chart of Accounts) مستوحى من معايير ERP."""
+        coa = [
+            # 1xxx: الأصول (Assets) - طبيعتها مدين
+            Account("1000", "الأصول المتداولة", AccountType.ASSET, NormalSide.DEBIT),
+            Account("1101", "الصندوق (النقدية)", AccountType.ASSET, NormalSide.DEBIT, "1000"),
+            Account("1102", "البنك / بوابة الدفع الإلكتروني", AccountType.ASSET, NormalSide.DEBIT, "1000"),
+            Account("1201", "ذمم العملاء المدينة", AccountType.ASSET, NormalSide.DEBIT, "1000"),
+            Account("1301", "مخزون الأدوية (في حال البيع المباشر)", AccountType.ASSET, NormalSide.DEBIT, "1000"),
+
+            # 2xxx: الخصوم / الالتزامات (Liabilities) - طبيعتها دائن
+            Account("2000", "الخصوم المتداولة", AccountType.LIABILITY, NormalSide.CREDIT),
+            Account("2101", "مستحقات الصيدليات الشريكة (الدائنون)", AccountType.LIABILITY, NormalSide.CREDIT, "2000"),
+            Account("2102", "الموردون (موردو الأدوية)", AccountType.LIABILITY, NormalSide.CREDIT, "2000"),
+            Account("2201", "ضريبة القيمة المضافة المستحقة", AccountType.LIABILITY, NormalSide.CREDIT, "2000"),
+
+            # 3xxx: حقوق الملكية (Equity) - طبيعتها دائن
+            Account("3000", "حقوق الملكية", AccountType.EQUITY, NormalSide.CREDIT),
+            Account("3101", "رأس المال", AccountType.EQUITY, NormalSide.CREDIT, "3000"),
+            Account("3201", "الأرباح المحتجزة / صافي الفترة", AccountType.EQUITY, NormalSide.CREDIT, "3000"),
+
+            # 4xxx: الإيرادات (Revenue) - طبيعتها دائن
+            Account("4000", "الإيرادات", AccountType.REVENUE, NormalSide.CREDIT),
+            Account("4101", "إيراد عمولات طلبات الأدوية", AccountType.REVENUE, NormalSide.CREDIT, "4000"),
+            Account("4102", "إيراد رسوم التوصيل", AccountType.REVENUE, NormalSide.CREDIT, "4000"),
+            Account("4103", "إيراد مبيعات الأدوية المباشرة", AccountType.REVENUE, NormalSide.CREDIT, "4000"),
+
+            # 5xxx: المصروفات (Expenses) - طبيعتها مدين
+            Account("5000", "المصروفات", AccountType.EXPENSE, NormalSide.DEBIT),
+            Account("5101", "تكلفة الأدوية المباعة (COGS)", AccountType.EXPENSE, NormalSide.DEBIT, "5000"),
+            Account("5201", "مصاريف التوصيل ومستحقات المناديب", AccountType.EXPENSE, NormalSide.DEBIT, "5000"),
+            Account("5202", "عمولات بوابات الدفع والرسوم البنكية", AccountType.EXPENSE, NormalSide.DEBIT, "5000"),
+            Account("5203", "رواتب وأجور التشغيل والدعم", AccountType.EXPENSE, NormalSide.DEBIT, "5000"),
+            Account("5204", "مصاريف تسويق وتبريد/تغليف طبي", AccountType.EXPENSE, NormalSide.DEBIT, "5000"),
+        ]
+        for acc in coa:
+            self.accounts[acc.code] = acc
+
+    def post_journal_entry(self, entry: JournalEntry) -> None:
+        """ترحيل قيد يومية بعد التحقق من وجود الحسابات وتوازن القيد."""
+        for line in entry.lines:
+            if line.account_code not in self.accounts:
+                raise KeyError(f"رمز الحساب غير موجود في دليل الحسابات: {line.account_code}")
+        entry.validate()
+        self.journal_entries.append(entry)
+
+    def get_account_balance(self, account_code: str) -> float:
+        """حساب رصيد حساب واحد بناءً على طبيعته المحاسبية."""
+        acc = self.accounts[account_code]
+        debit_sum = sum(l.debit for e in self.journal_entries for l in e.lines if l.account_code == account_code)
+        credit_sum = sum(l.credit for e in self.journal_entries for l in e.lines if l.account_code == account_code)
+        if acc.normal_side == NormalSide.DEBIT:
+            return round(debit_sum - credit_sum, 2)
+        return round(credit_sum - debit_sum, 2)
+
+    def get_account_movement(self, account_code: str) -> tuple[float, float]:
+        """إرجاع (إجمالي المدين، إجمالي الدائن) لحساب معين."""
+        debit_sum = round(sum(l.debit for e in self.journal_entries for l in e.lines if l.account_code == account_code), 2)
+        credit_sum = round(sum(l.credit for e in self.journal_entries for l in e.lines if l.account_code == account_code), 2)
+        return debit_sum, credit_sum
+
+    # ------------------------------------------------------------------
+    # دوال المعاملات التجارية لمنصة توصيل الأدوية (Business Transactions)
+    # ------------------------------------------------------------------
+
+    def capital_injection(self, entry_id: str, d: date, amount: float, to_bank: bool = True) -> None:
+        """1) إيداع رأس المال في البنك أو الصندوق."""
+        target_acc = "1102" if to_bank else "1101"
+        self.post_journal_entry(JournalEntry(
+            entry_id=entry_id,
+            entry_date=d,
+            description="إيداع رأس مال لتأسيس وتشغيل منصة الأدوية",
+            reference="CAP-001",
+            lines=[
+                JournalLine(target_acc, debit=amount, memo="إيداع رأس المال"),
+                JournalLine("3101", credit=amount, memo="رأس المال المدفوع"),
+            ]
+        ))
+
+    def record_marketplace_order(
+        self,
+        entry_id: str,
+        d: date,
+        order_ref: str,
+        medicine_amount: float,
+        delivery_fee: float,
+        commission_rate: float = 0.15,
+        paid_online: bool = True,
+    ) -> None:
+        """
+        2) تسجيل طلب دواء عبر صيدلية شريكة (نموذج العمولة والتوصيل):
+        - إجمالي ما يدفعه العميل = قيمة الدواء + رسوم التوصيل.
+        - عمولة المنصة = نسبة من قيمة الدواء.
+        - مستحق الصيدلية = قيمة الدواء - عمولة المنصة.
+        """
+        customer_total = round(medicine_amount + delivery_fee, 2)
+        platform_commission = round(medicine_amount * commission_rate, 2)
+        pharmacy_payable = round(medicine_amount - platform_commission, 2)
+        collection_acc = "1102" if paid_online else "1201"
+
+        self.post_journal_entry(JournalEntry(
+            entry_id=entry_id,
+            entry_date=d,
+            description=f"طلب توصيل أدوية رقم {order_ref}",
+            reference=order_ref,
+            lines=[
+                JournalLine(collection_acc, debit=customer_total, memo="تحصيل/ذمة إجمالي الطلب من العميل"),
+                JournalLine("2101", credit=pharmacy_payable, memo="مستحق الصيدلية بعد خصم العمولة"),
+                JournalLine("4101", credit=platform_commission, memo="إيراد عمولة المنصة"),
+                JournalLine("4102", credit=delivery_fee, memo="إيراد رسوم التوصيل"),
+            ]
+        ))
+
+    def settle_pharmacy_payout(self, entry_id: str, d: date, pharmacy_ref: str, amount: float) -> None:
+        """3) سداد مستحقات الصيدلية الشريكة من الحساب البنكي."""
+        self.post_journal_entry(JournalEntry(
+            entry_id=entry_id,
+            entry_date=d,
+            description=f"تسوية مستحقات صيدلية ({pharmacy_ref})",
+            reference=pharmacy_ref,
+            lines=[
+                JournalLine("2101", debit=amount, memo="تخفيض مستحقات الصيدلية"),
+                JournalLine("1102", credit=amount, memo="تحويل بنكي للصيدلية"),
+            ]
+        ))
+
+    def record_delivery_expense(self, entry_id: str, d: date, courier_ref: str, amount: float, from_cash: bool = True) -> None:
+        """4) تسجيل مصروف التوصيل / مستحقات مناديب التوصيل."""
+        pay_acc = "1101" if from_cash else "1102"
+        self.post_journal_entry(JournalEntry(
+            entry_id=entry_id,
+            entry_date=d,
+            description=f"مصروف توصيل طلبات ({courier_ref})",
+            reference=courier_ref,
+            lines=[
+                JournalLine("5201", debit=amount, memo="تكلفة/مصاريف التوصيل"),
+                JournalLine(pay_acc, credit=amount, memo="سداد مصروف التوصيل"),
+            ]
+        ))
+
+    def record_operating_expense(
+        self,
+        entry_id: str,
+        d: date,
+        expense_acc_code: str,
+        amount: float,
+        description: str,
+        reference: str,
+        from_bank: bool = True,
+    ) -> None:
+        """5) تسجيل مصروف تشغيلي (رواتب، بوابة دفع، تغليف طبي، تسويق)."""
+        pay_acc = "1102" if from_bank else "1101"
+        self.post_journal_entry(JournalEntry(
+            entry_id=entry_id,
+            entry_date=d,
+            description=description,
+            reference=reference,
+            lines=[
+                JournalLine(expense_acc_code, debit=amount, memo=description),
+                JournalLine(pay_acc, credit=amount, memo="سداد المصروف التشغيلي"),
+            ]
+        ))
+
+    # ------------------------------------------------------------------
+    # القوائم المالية (Financial Statements)
+    # ------------------------------------------------------------------
+
+    def trial_balance(self) -> List[dict]:
+        """ميزان المراجعة (Trial Balance)."""
+        rows = []
+        for code, acc in sorted(self.accounts.items()):
+            # نستبعد الحسابات التجميعية الرئيسية التي ليس لها قيود مباشرة إذا أردنا، أو نعرض الكل
+            debit_sum, credit_sum = self.get_account_movement(code)
+            bal = self.get_account_balance(code)
+            if debit_sum > 0 or credit_sum > 0:
+                rows.append({
+                    "code": code,
+                    "name": acc.name,
+                    "type": acc.account_type.value,
+                    "debit": debit_sum,
+                    "credit": credit_sum,
+                    "balance": bal,
+                    "normal_side": acc.normal_side.value,
+                })
+        return rows
+
+    def income_statement(self) -> dict:
+        """قائمة الدخل / الأرباح والخسائر (Income Statement)."""
+        revenues = {}
+        expenses = {}
+        for code, acc in sorted(self.accounts.items()):
+            bal = self.get_account_balance(code)
+            if acc.account_type == AccountType.REVENUE and bal != 0:
+                revenues[acc.name] = bal
+            elif acc.account_type == AccountType.EXPENSE and bal != 0:
+                expenses[acc.name] = bal
+
+        total_rev = round(sum(revenues.values()), 2)
+        total_exp = round(sum(expenses.values()), 2)
+        net_income = round(total_rev - total_exp, 2)
+        return {
+            "revenues": revenues,
+            "total_revenue": total_rev,
+            "expenses": expenses,
+            "total_expense": total_exp,
+            "net_income": net_income,
+        }
+
+    def balance_sheet(self) -> dict:
+        """الميزانية العمومية / قائمة المركز المالي (Balance Sheet)."""
+        assets = {}
+        liabilities = {}
+        equity = {}
+
+        for code, acc in sorted(self.accounts.items()):
+            bal = self.get_account_balance(code)
+            if acc.account_type == AccountType.ASSET and bal != 0:
+                assets[acc.name] = bal
+            elif acc.account_type == AccountType.LIABILITY and bal != 0:
+                liabilities[acc.name] = bal
+            elif acc.account_type == AccountType.EQUITY and bal != 0:
+                equity[acc.name] = bal
+
+        # ترحيل صافي الربح/الخسارة إلى حقوق الملكية لإغلاق الميزانية
+        net_income = self.income_statement()["net_income"]
+        equity["صافي ربح (خسارة) الفترة الحالية"] = net_income
+
+        total_assets = round(sum(assets.values()), 2)
+        total_liabilities = round(sum(liabilities.values()), 2)
+        total_equity = round(sum(equity.values()), 2)
+
+        return {
+            "assets": assets,
+            "total_assets": total_assets,
+            "liabilities": liabilities,
+            "total_liabilities": total_liabilities,
+            "equity": equity,
+            "total_equity": total_equity,
+            "liabilities_plus_equity": round(total_liabilities + total_equity, 2),
+        }
+
+
+# ----------------------------------------------------------------------
+# مثال تشغيل تجريبي (Demo Execution)
+# ----------------------------------------------------------------------
 if __name__ == "__main__":
-    erp = ChartOfAccountsERP(":memory:")
-    erp.load_accounts(ACCOUNTS_DATA)
-    erp.print_tree()
-    erp.close()
+    erp = PharmacyDeliveryERP()
+    today = date(2026, 11, 25)
+
+    # 1. رأس المال
+    erp.capital_injection("JE-001", today, amount=50000.0, to_bank=True)
+
+    # 2. طلب دواء بقيمة 200 ورسوم توصيل 25 وعمولة منصة 15% (30) -> مستحق الصيدلية 170
+    erp.record_marketplace_order(
+        entry_id="JE-002",
+        d=today,
+        order_ref="ORD-1001",
+        medicine_amount=200.0,
+        delivery_fee=25.0,
+        commission_rate=0.15,
+        paid_online=True,
+    )
+
+    # 3. طلب آخر بقيمة 100 ورسوم توصيل 15 وعمولة منصة 15% (15) -> مستحق الصيدلية 85
+    erp.record_marketplace_order(
+        entry_id="JE-003",
+        d=today,
+        order_ref="ORD-1002",
+        medicine_amount=100.0,
+        delivery_fee=15.0,
+        commission_rate=0.15,
+        paid_online=True,
+    )
+
+    # 4. سداد جزء من مستحقات الصيدلية (150 من أصل 255)
+    erp.settle_pharmacy_payout("JE-004", today, pharmacy_ref="PH-01", amount=150.0)
+
+    # 5. مصاريف التوصيل والرواتب
+    erp.record_delivery_expense("JE-005", today, courier_ref="DLV-01", amount=20.0, from_cash=False)
+    erp.record_operating_expense("JE-006", today, "5203", amount=1200.0, "رواتب دعم فني وتشغيل", "SAL-11")
+
+    print("=== ميزان المراجعة (Trial Balance) ===")
+    for r in erp.trial_balance():
+        print(f"{r['code']} | {r['name']} | مدين: {r['debit']} | دائن: {r['credit']} | رصيد ({r['normal_side']}): {r['balance']}")
+
+    inc = erp.income_statement()
+    print("\n=== قائمة الدخل (Income Statement) ===")
+    print("الإيرادات:", inc["revenues"], "-> الإجمالي:", inc["total_revenue"])
+    print("المصروفات:", inc["expenses"], "-> الإجمالي:", inc["total_expense"])
+    print("صافي الربح/الخسارة:", inc["net_income"])
+
+    bs = erp.balance_sheet()
+    print("\n=== الميزانية العمومية (Balance Sheet) ===")
+    print("الأصول:", bs["assets"], "-> الإجمالي:", bs["total_assets"])
+    print("الخصوم:", bs["liabilities"], "-> الإجمالي:", bs["total_liabilities"])
+    print("حقوق الملكية:", bs["equity"], "-> الإجمالي:", bs["total_equity"])
+    print("التحقق (الخصوم + حقوق الملكية):", bs["liabilities_plus_equity"])
