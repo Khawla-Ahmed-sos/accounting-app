@@ -7,8 +7,8 @@ from enum import Enum
 from typing import Dict, List
 
 
-def money(value: float | int | str | Decimal) -> Decimal:
-    return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+def to_money(amount: float | int | str | Decimal) -> Decimal:
+    return Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 class AccountType(str, Enum):
@@ -22,16 +22,14 @@ class AccountType(str, Enum):
 class Account:
     code: str
     name: str
-    account_type: AccountType
+    acc_type: AccountType
     balance: Decimal = Decimal("0.00")
 
-    def apply(self, debit: Decimal, credit: Decimal) -> None:
-        # في الأصول والمصروفات: المدين يزيد والائتمان ينقص
-        # في الخصوم والإيرادات: الائتمان يزيد والمدين ينقص
-        if self.account_type in (AccountType.ASSET, AccountType.EXPENSE):
-            self.balance += (debit - credit)
+    def post(self, debit: Decimal, credit: Decimal) -> None:
+        if self.acc_type in (AccountType.ASSET, AccountType.EXPENSE):
+            self.balance += debit - credit
         else:
-            self.balance += (credit - debit)
+            self.balance += credit - debit
 
 
 @dataclass
@@ -39,186 +37,147 @@ class JournalLine:
     account_code: str
     debit: Decimal = Decimal("0.00")
     credit: Decimal = Decimal("0.00")
-    party_id: str | None = None  # مثل معرف الصيدلية أو المندوب
+    party_id: str | None = None
 
 
 @dataclass
 class JournalEntry:
     entry_id: str
-    entry_date: date
-    description: str
+    tx_date: date
+    memo: str
     lines: List[JournalLine] = field(default_factory=list)
 
-    def is_balanced(self) -> bool:
-        total_debit = sum((line.debit for line in self.lines), Decimal("0.00"))
-        total_credit = sum((line.credit for line in self.lines), Decimal("0.00"))
-        return total_debit == total_credit
+    def balanced(self) -> bool:
+        debits = sum((l.debit for l in self.lines), Decimal("0.00"))
+        credits = sum((l.credit for l in self.lines), Decimal("0.00"))
+        return debits == credits
 
 
-class PharmacyPlatformERP:
-    """محرك محاسبي مبسط بنمط ERP لمنصة وسيطة للأدوية والتوصيل."""
-
+class PharmacyAccountingSystem:
     def __init__(self) -> None:
         self.accounts: Dict[str, Account] = {}
-        self.entries: List[JournalEntry] = []
-        self.pharmacy_payables: Dict[str, Decimal] = {}
-        self._setup_chart_of_accounts()
+        self.journal: List[JournalEntry] = []
+        self.pharmacy_balances: Dict[str, Decimal] = {}
+        self._init_accounts()
 
-    def _setup_chart_of_accounts(self) -> None:
-        default_accounts = [
-            Account("1010", "البنك / بوابة الدفع", AccountType.ASSET),
-            Account("1020", "عهدة مناديب التوصيل (نقد عند الاستلام)", AccountType.ASSET),
-            Account("2010", "مستحقات الصيدليات (تسوية)", AccountType.LIABILITY),
-            Account("2020", "ضريبة القيمة المضافة المستحقة", AccountType.LIABILITY),
-            Account("4010", "إيراد عمولات المنصة من الصيدليات", AccountType.REVENUE),
+    def _init_accounts(self) -> None:
+        base_accounts = [
+            Account("1010", "البنك / المحفظة الإلكترونية", AccountType.ASSET),
+            Account("1020", "عهدة المندوبين (نقدي)", AccountType.ASSET),
+            Account("2010", "مستحقات الصيدليات", AccountType.LIABILITY),
+            Account("4010", "إيراد عمولات المنصة", AccountType.REVENUE),
             Account("4020", "إيراد رسوم التوصيل", AccountType.REVENUE),
-            Account("5010", "مصروف أجور/تكلفة التوصيل", AccountType.EXPENSE),
+            Account("5010", "مصروف التوصيل / المندوبين", AccountType.EXPENSE),
         ]
-        for acc in default_accounts:
+        for acc in base_accounts:
             self.accounts[acc.code] = acc
 
-    def post_entry(self, entry: JournalEntry) -> None:
-        if not entry.is_balanced():
-            raise ValueError(f"القيد {entry.entry_id} غير متوازن: المدين لا يساوي الدائن.")
+    def add_entry(self, entry: JournalEntry) -> None:
+        if not entry.balanced():
+            raise ValueError(f"القيد {entry.entry_id} غير متوازن")
 
         for line in entry.lines:
-            if line.account_code not in self.accounts:
-                raise KeyError(f"الحساب {line.account_code} غير موجود في شجرة الحسابات.")
-            debit = money(line.debit)
-            credit = money(line.credit)
-            self.accounts[line.account_code].apply(debit, credit)
+            d = to_money(line.debit)
+            c = to_money(line.credit)
+            self.accounts[line.account_code].post(d, c)
 
-            # تتبع رصيد كل صيدلية على حدة ضمن حساب 2010
             if line.account_code == "2010" and line.party_id:
-                current = self.pharmacy_payables.get(line.party_id, Decimal("0.00"))
-                self.pharmacy_payables[line.party_id] = current + (credit - debit)
+                prev = self.pharmacy_balances.get(line.party_id, Decimal("0.00"))
+                self.pharmacy_balances[line.party_id] = prev + (c - d)
 
-        self.entries.append(entry)
+        self.journal.append(entry)
 
-    def record_order_settlement(
+    def record_order(
         self,
         order_id: str,
         tx_date: date,
         pharmacy_id: str,
-        medicine_subtotal: float,
+        medicine_amount: float,
         delivery_fee: float,
         commission_rate: float = 0.15,
-        courier_payout: float = 0.0,
-        payment_method: str = "ONLINE",  # "ONLINE" أو "COD"
-        vat_rate: float = 0.0,
+        courier_cost: float = 0.0,
+        is_cash_on_delivery: bool = False,
     ) -> None:
-        """
-        تسجيل محاسبي لطلب دواء مكتمل التوصيل:
-        - إجمالي ما يدفعه العميل = قيمة الأدوية + الضريبة + رسوم التوصيل
-        - عمولة المنصة = نسبة من قيمة الأدوية
-        - مستحق الصيدلية = قيمة الأدوية - عمولة المنصة
-        """
-        med_amount = money(medicine_subtotal)
-        deliv_fee = money(delivery_fee)
-        vat_amount = money(med_amount * Decimal(str(vat_rate)))
-        commission = money(med_amount * Decimal(str(commission_rate)))
-        pharmacy_due = money(med_amount - commission)
-        courier_cost = money(courier_payout)
+        med = to_money(medicine_amount)
+        deliv = to_money(delivery_fee)
+        commission = to_money(med * Decimal(str(commission_rate)))
+        pharmacy_share = to_money(med - commission)
+        courier = to_money(courier_cost)
+        total_in = to_money(med + deliv)
 
-        total_collected = money(med_amount + vat_amount + deliv_fee)
-        collection_account = "1010" if payment_method.upper() == "ONLINE" else "1020"
-
-        lines: List[JournalLine] = [
-            # 1. تحصيل المبلغ من العميل
-            JournalLine(account_code=collection_account, debit=total_collected),
-            # 2. إثبات مستحق الصيدلية (بعد خصم عمولة المنصة)
-            JournalLine(
-                account_code="2010",
-                credit=pharmacy_due,
-                party_id=pharmacy_id,
-            ),
-            # 3. إثبات عمولة المنصة
-            JournalLine(account_code="4010", credit=commission),
+        cash_or_bank = "1020" if is_cash_on_delivery else "1010"
+        lines = [
+            JournalLine(cash_or_bank, debit=total_in),
+            JournalLine("2010", credit=pharmacy_share, party_id=pharmacy_id),
+            JournalLine("4010", credit=commission),
         ]
 
-        if vat_amount > Decimal("0.00"):
-            lines.append(JournalLine(account_code="2020", credit=vat_amount))
+        if deliv > Decimal("0.00"):
+            lines.append(JournalLine("4020", credit=deliv))
 
-        if deliv_fee > Decimal("0.00"):
-            lines.append(JournalLine(account_code="4020", credit=deliv_fee))
+        if courier > Decimal("0.00"):
+            lines.append(JournalLine("5010", debit=courier))
+            lines.append(JournalLine("1020", credit=courier))
 
-        if courier_cost > Decimal("0.00"):
-            # قيد تكلفة التوصيل مقابل رصيد المندوب أو البنك
-            lines.append(JournalLine(account_code="5010", debit=courier_cost))
-            lines.append(JournalLine(account_code="1020", credit=courier_cost))
-
-        entry = JournalEntry(
-            entry_id=f"JE-ORD-{order_id}",
-            entry_date=tx_date,
-            description=f"تسوية طلب دواء #{order_id} - صيدلية {pharmacy_id}",
-            lines=lines,
+        self.add_entry(
+            JournalEntry(
+                entry_id=f"ORD-{order_id}",
+                tx_date=tx_date,
+                memo=f"طلب #{order_id} - صيدلية {pharmacy_id}",
+                lines=lines,
+            )
         )
-        self.post_entry(entry)
 
-    def settle_pharmacy_balance(
+    def pay_pharmacy(
         self,
-        settlement_id: str,
+        payment_id: str,
         tx_date: date,
         pharmacy_id: str,
         amount: float,
     ) -> None:
-        """صرف وتحويل مستحقات الصيدلية من حساب البنك."""
-        pay_amount = money(amount)
-        current_due = self.pharmacy_payables.get(pharmacy_id, Decimal("0.00"))
-        if pay_amount <= Decimal("0.00") or pay_amount > current_due:
-            raise ValueError(
-                f"مبلغ التسوية ({pay_amount}) غير صالح؛ المستحق الحالي للصيدلية {pharmacy_id} هو {current_due}."
-            )
+        pay = to_money(amount)
+        due = self.pharmacy_balances.get(pharmacy_id, Decimal("0.00"))
+        if pay <= Decimal("0.00") or pay > due:
+            raise ValueError(f"المبلغ {pay} غير صحيح. المستحق للصيدلية {due}")
 
-        entry = JournalEntry(
-            entry_id=f"JE-STL-{settlement_id}",
-            entry_date=tx_date,
-            description=f"تحويل مستحقات صيدلية {pharmacy_id}",
-            lines=[
-                JournalLine(account_code="2010", debit=pay_amount, party_id=pharmacy_id),
-                JournalLine(account_code="1010", credit=pay_amount),
-            ],
+        self.add_entry(
+            JournalEntry(
+                entry_id=f"PAY-{payment_id}",
+                tx_date=tx_date,
+                memo=f"سداد مستحقات صيدلية {pharmacy_id}",
+                lines=[
+                    JournalLine("2010", debit=pay, party_id=pharmacy_id),
+                    JournalLine("1010", credit=pay),
+                ],
+            )
         )
-        self.post_entry(entry)
 
-    def trial_balance(self) -> List[Dict[str, str]]:
-        report = []
-        for code, acc in self.accounts.items():
-            report.append(
-                {
-                    "code": code,
-                    "name": acc.name,
-                    "type": acc.account_type.value,
-                    "balance": f"{acc.balance:.2f}",
-                }
-            )
-        return report
+    def get_trial_balance(self) -> List[Dict[str, str]]:
+        return [
+            {
+                "code": acc.code,
+                "name": acc.name,
+                "type": acc.acc_type.value,
+                "balance": f"{acc.balance:.2f}",
+            }
+            for acc in self.accounts.values()
+        ]
 
 
 if __name__ == "__main__":
-    erp = PharmacyPlatformERP()
-
-    # مثال 1: طلب دواء بقيمة 200، توصيل 20، عمولة 15%، دفع إلكتروني
-    erp.record_order_settlement(
-        order_id="1001",
+    system = PharmacyAccountingSystem()
+    system.record_order(
+        order_id="501",
         tx_date=date(2026, 11, 25),
-        pharmacy_id="PH-01",
-        medicine_subtotal=200.00,
-        delivery_fee=20.00,
-        commission_rate=0.15,
-        courier_payout=15.00,
-        payment_method="ONLINE",
+        pharmacy_id="PH-1",
+        medicine_amount=150.0,
+        delivery_fee=15.0,
+        commission_rate=0.10,
+        courier_cost=10.0,
+        is_cash_on_delivery=True,
     )
+    system.pay_pharmacy("P-1", date(2026, 11, 25), "PH-1", 50.0)
 
-    # مثال 2: سداد جزئي لمستحقات الصيدلية PH-01
-    erp.settle_pharmacy_balance(
-        settlement_id="S-01",
-        tx_date=date(2026, 11, 25),
-        pharmacy_id="PH-01",
-        amount=100.00,
-    )
-
-    print("مستحق الصيدلية PH-01 المتبقي:", erp.pharmacy_payables.get("PH-01"))
-    print("ميزان المراجعة:")
-    for row in erp.trial_balance():
+    print("مستحق الصيدلية PH-1:", system.pharmacy_balances.get("PH-1"))
+    for row in system.get_trial_balance():
         print(row)
